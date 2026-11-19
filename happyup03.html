@@ -1,0 +1,1339 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>이어그리기 - 협동 릴레이 드로잉 게임</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Jua & Noto Sans KR -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet" />
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ['"Jua"', 'sans-serif'],
+            sans: ['"Noto Sans KR"', 'sans-serif'],
+          },
+          colors: {
+            cream: '#FFFDF7',
+            paper: '#FFFFFF',
+            mint: '#E6F5EC',
+            mintDark: '#2E7D52',
+            coral: '#FF6B6B',
+            sunny: '#FFD166',
+            sky: '#4ECDC4',
+            ink: '#2D3436',
+          },
+          boxShadow: {
+            'card': '0 10px 25px -5px rgba(45, 52, 54, 0.08), 0 8px 10px -6px rgba(45, 52, 54, 0.04)',
+            'btn': '0 4px 0 rgba(0, 0, 0, 0.15)',
+            'btn-active': '0 1px 0 rgba(0, 0, 0, 0.15)',
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: #F6F4EB;
+      background-image:
+        radial-gradient(#DCD7C9 1px, transparent 1px),
+        radial-gradient(#DCD7C9 1px, #F6F4EB 1px);
+      background-size: 24px 24px;
+      background-position: 0 0, 12px 12px;
+      color: #2D3436;
+      font-family: 'Noto Sans KR', sans-serif;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+    }
+
+    .font-jua {
+      font-family: 'Jua', sans-serif;
+    }
+
+    /* 스케치북 스프링 효과 */
+    .sketchbook-rings {
+      background-image: radial-gradient(circle at 50% 50%, #4A5568 5px, transparent 6px);
+      background-size: 36px 24px;
+      background-repeat: repeat-x;
+    }
+
+    /* 캔버스 터치 스크롤 방지 */
+    #drawingCanvas {
+      touch-action: none;
+      cursor: crosshair;
+      background-color: #FFFFFF;
+    }
+
+    /* 버튼 입체 클릭 효과 */
+    .pop-btn {
+      transition: transform 0.1s ease, box-shadow 0.1s ease, background-color 0.15s ease;
+      box-shadow: 0 4px 0 rgba(45, 52, 54, 0.18);
+    }
+    .pop-btn:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 rgba(45, 52, 54, 0.18);
+    }
+
+    /* 타이머 긴박 애니메이션 */
+    @keyframes pulseUrgent {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.12); }
+    }
+    .timer-urgent {
+      animation: pulseUrgent 0.6s infinite ease-in-out;
+    }
+
+    /* 화면 전환 페이드인 */
+    @keyframes fadeSlideUp {
+      from {
+        opacity: 0;
+        transform: translateY(12px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    .animate-enter {
+      animation: fadeSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    /* 색상 팔레트 선택 링 */
+    .color-swatch.selected {
+      transform: scale(1.18);
+      box-shadow: 0 0 0 3px #FFFFFF, 0 0 0 5px #2D3436;
+    }
+
+    /* 커스텀 스크롤바 */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between">
+
+  <!-- 상단 미니 헤더 -->
+  <header class="w-full max-w-4xl mx-auto px-4 pt-3 pb-1 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <span class="text-2xl">🎨</span>
+      <h1 class="font-jua text-2xl sm:text-3xl tracking-tight text-gray-800">이어그리기</h1>
+      <span class="bg-mint text-mintDark text-xs sm:text-sm font-bold px-2.5 py-0.5 rounded-full border border-emerald-200 shadow-sm">
+        기획: 박지은
+      </span>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <!-- 효과음 토글 버튼 -->
+      <button id="soundToggleBtn" onclick="toggleSound()" title="효과음 켜기/끄기"
+        class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-full px-3 py-1.5 text-sm font-medium flex items-center gap-1.5 shadow-sm transition">
+        <span id="soundIcon">🔊</span>
+        <span class="hidden sm:inline" id="soundLabel">소리 켜짐</span>
+      </button>
+      <!-- 홈으로 버튼 (게임 중에만 표시) -->
+      <button id="homeResetBtn" onclick="confirmResetToLobby()"
+        class="hidden bg-white hover:bg-red-50 text-red-500 border border-red-200 rounded-full px-3 py-1.5 text-sm font-bold shadow-sm transition">
+        처음으로
+      </button>
+    </div>
+  </header>
+
+  <!-- 메인 컨테이너 -->
+  <main class="flex-1 w-full max-w-4xl mx-auto px-3 sm:px-4 py-2 flex flex-col justify-center">
+
+    <!-- ==================== 1. 게임 설정 (로비 화면) ==================== -->
+    <section id="lobbyScreen" class="animate-enter bg-cream rounded-3xl shadow-card border-2 border-amber-200/80 overflow-hidden">
+      <!-- 스케치북 상단 장식 바 -->
+      <div class="h-6 bg-amber-100/70 border-b border-amber-200/60 sketchbook-rings"></div>
+
+      <div class="p-5 sm:p-8 space-y-6">
+        <!-- 게임 소개 카드 (원본 기획안 감성 반영) -->
+        <div class="bg-mint/80 border border-emerald-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div class="space-y-1.5">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white text-mintDark font-bold text-sm shadow-sm">박</span>
+              <span class="font-bold text-emerald-900">박지은 기획자의 게임 방법</span>
+            </div>
+            <p class="text-sm sm:text-base text-emerald-950 leading-relaxed">
+              첫 번째 사람이 제한시간 안에 자유롭게 그림을 그리면, 다음 사람이 그 그림을 이어서 완성하는 협동 릴레이 드로잉 게임이에요!
+            </p>
+          </div>
+          <div class="flex items-center gap-1.5 text-2xl shrink-0 bg-white/80 px-3 py-2 rounded-2xl border border-emerald-100">
+            <span>🖍️</span><span>➡️</span><span>🖌️</span><span>➡️</span><span>🖼️</span>
+          </div>
+        </div>
+
+        <!-- 설정 그리드 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <!-- 왼쪽: 참가자 설정 -->
+          <div class="bg-white rounded-2xl p-4 sm:p-5 border border-gray-200/80 shadow-sm space-y-4">
+            <div class="flex items-center justify-between">
+              <label class="font-jua text-lg text-gray-800 flex items-center gap-1.5">
+                <span>👥</span> 참가 인원
+              </label>
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="changePlayerCount(-1)"
+                  class="w-9 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 font-bold text-lg text-gray-700 flex items-center justify-center transition">
+                  -
+                </button>
+                <span id="playerCountDisplay" class="font-jua text-xl w-12 text-center text-emerald-600">3명</span>
+                <button type="button" onclick="changePlayerCount(1)"
+                  class="w-9 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 font-bold text-lg text-gray-700 flex items-center justify-center transition">
+                  +
+                </button>
+              </div>
+            </div>
+
+            <!-- 플레이어 이름 입력 목록 -->
+            <div id="playerInputsList" class="space-y-2 max-h-52 overflow-y-auto pr-1">
+              <!-- JS로 동적 생성 -->
+            </div>
+          </div>
+
+          <!-- 오른쪽: 시간, 라운드, 주제 설정 -->
+          <div class="bg-white rounded-2xl p-4 sm:p-5 border border-gray-200/80 shadow-sm space-y-4 flex flex-col justify-between">
+            <!-- 제한 시간 선택 -->
+            <div class="space-y-2">
+              <label class="font-jua text-lg text-gray-800 flex items-center gap-1.5">
+                <span>⏱️</span> 한 사람당 제한 시간
+              </label>
+              <div class="grid grid-cols-4 gap-2" id="timeSelector">
+                <button type="button" data-time="15" onclick="selectTime(15)"
+                  class="time-btn py-2 rounded-xl border-2 border-gray-200 font-bold text-sm text-gray-600 hover:border-amber-400 transition">
+                  15초
+                </button>
+                <button type="button" data-time="30" onclick="selectTime(30)"
+                  class="time-btn py-2 rounded-xl border-2 border-amber-400 bg-amber-50 font-bold text-sm text-amber-800 transition">
+                  30초
+                </button>
+                <button type="button" data-time="45" onclick="selectTime(45)"
+                  class="time-btn py-2 rounded-xl border-2 border-gray-200 font-bold text-sm text-gray-600 hover:border-amber-400 transition">
+                  45초
+                </button>
+                <button type="button" data-time="60" onclick="selectTime(60)"
+                  class="time-btn py-2 rounded-xl border-2 border-gray-200 font-bold text-sm text-gray-600 hover:border-amber-400 transition">
+                  60초
+                </button>
+              </div>
+            </div>
+
+            <!-- 라운드 수 선택 -->
+            <div class="space-y-2">
+              <label class="font-jua text-lg text-gray-800 flex items-center gap-1.5">
+                <span>🔄</span> 몇 바퀴 돌까요?
+              </label>
+              <div class="grid grid-cols-2 gap-2" id="roundSelector">
+                <button type="button" data-rounds="1" onclick="selectRounds(1)"
+                  class="round-btn py-2 rounded-xl border-2 border-emerald-500 bg-emerald-50 font-bold text-sm text-emerald-800 transition">
+                  1바퀴 (한 번씩)
+                </button>
+                <button type="button" data-rounds="2" onclick="selectRounds(2)"
+                  class="round-btn py-2 rounded-xl border-2 border-gray-200 font-bold text-sm text-gray-600 hover:border-emerald-400 transition">
+                  2바퀴 (두 번씩)
+                </button>
+              </div>
+            </div>
+
+            <!-- 주제 추천 -->
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <label class="font-jua text-lg text-gray-800 flex items-center gap-1.5">
+                  <span>💡</span> 그리기 주제
+                </label>
+                <button type="button" onclick="pickRandomTheme()"
+                  class="text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-2.5 py-1 rounded-lg border border-indigo-200 transition">
+                  🎲 주제 추천 받기
+                </button>
+              </div>
+              <div class="relative">
+                <input id="themeInput" type="text" value="자유 주제 (마음대로 그려요!)" maxlength="30"
+                  placeholder="주제를 입력하거나 추천을 눌러보세요"
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-sm font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-white transition" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 게임 시작 버튼 -->
+        <div class="pt-1">
+          <button type="button" onclick="startGame()"
+            class="pop-btn w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-jua text-2xl tracking-wide flex items-center justify-center gap-2">
+            <span>🎨</span>
+            <span>이어그리기 시작!</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 2. 그리기 & 차례 안내 화면 ==================== -->
+    <section id="gameScreen" class="hidden flex-col gap-2.5 animate-enter">
+      <!-- 상단 상태 바 -->
+      <div class="bg-white rounded-2xl px-3.5 py-2.5 shadow-sm border border-gray-200 flex flex-wrap items-center justify-between gap-2">
+        <!-- 현재 플레이어 & 턴 -->
+        <div class="flex items-center gap-2.5">
+          <div id="currentPlayerBadge" class="px-3 py-1 rounded-xl font-jua text-base sm:text-lg text-white bg-emerald-500 shadow-sm flex items-center gap-1.5">
+            <span>🖌️</span>
+            <span id="currentPlayerName">플레이어 1</span>
+          </div>
+          <span id="turnIndicator" class="text-xs sm:text-sm font-bold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-lg">
+            1 / 3 턴
+          </span>
+        </div>
+
+        <!-- 주제 표시 -->
+        <div class="hidden md:flex items-center gap-1.5 bg-amber-50 border border-amber-200 px-3 py-1 rounded-xl text-xs font-bold text-amber-900 max-w-xs truncate">
+          <span>💡</span>
+          <span id="activeThemeText" class="truncate">자유 주제</span>
+        </div>
+
+        <!-- 카운트다운 타이머 -->
+        <div class="flex items-center gap-2">
+          <div id="timerBox" class="flex items-center gap-1.5 bg-gray-100 px-3.5 py-1 rounded-xl border border-gray-200 transition-colors">
+            <span class="text-base">⏱️</span>
+            <span id="timerDisplay" class="font-jua text-xl sm:text-2xl text-gray-800 tabular-nums">30</span>
+            <span class="text-xs font-bold text-gray-500">초</span>
+          </div>
+          <button type="button" onclick="finishCurrentTurn()"
+            class="pop-btn bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs sm:text-sm px-3.5 py-2 rounded-xl flex items-center gap-1">
+            <span>다 그렸어요!</span>
+            <span>✅</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 모바일용 주제 배너 -->
+      <div class="md:hidden flex items-center justify-center gap-1.5 bg-amber-50/90 border border-amber-200 px-3 py-1 rounded-xl text-xs font-bold text-amber-900">
+        <span>💡 주제:</span>
+        <span id="activeThemeTextMobile" class="truncate">자유 주제</span>
+      </div>
+
+      <!-- 스케치북 캔버스 래퍼 -->
+      <div class="relative w-full bg-white rounded-3xl shadow-card border-2 border-gray-200 overflow-hidden">
+        <!-- 캔버스 컨테이너 (4:3 비율 유지하되 화면 높이에 맞춤) -->
+        <div id="canvasWrapper" class="relative w-full aspect-[4/3] max-h-[58vh] bg-white mx-auto">
+          <canvas id="drawingCanvas" class="w-full h-full block"></canvas>
+
+          <!-- 차례 전환 (Handoff) 오버레이 -->
+          <div id="turnOverlay"
+            class="absolute inset-0 z-20 bg-cream/95 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center">
+            <div class="max-w-sm w-full bg-white rounded-3xl p-6 shadow-card border-2 border-amber-200 space-y-4">
+              <div id="overlayTurnBadge" class="inline-block bg-amber-100 text-amber-800 font-bold text-xs px-3 py-1 rounded-full">
+                1번째 순서 (총 3턴)
+              </div>
+              <div class="space-y-1">
+                <p class="text-gray-500 text-sm font-medium" id="overlayHelperText">스케치북을 넘겨주세요!</p>
+                <h2 class="font-jua text-3xl text-gray-800">
+                  <span id="overlayPlayerName" class="text-emerald-600">플레이어 1</span>님의 차례!
+                </h2>
+              </div>
+              <p id="overlayInstruction" class="text-xs sm:text-sm text-gray-600 bg-gray-50 p-3 rounded-2xl leading-relaxed">
+                제한시간 <strong class="text-gray-900" id="overlayTimeText">30초</strong> 동안 자유롭게 그림을 시작해 주세요!
+              </p>
+              <button type="button" onclick="beginTurnDrawing()"
+                class="pop-btn w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-400 to-orange-400 hover:from-amber-500 hover:to-orange-500 text-white font-jua text-xl shadow-md">
+                🖌️ 그리기 시작!
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 하단 그리기 도구 툴바 -->
+      <div class="bg-white rounded-2xl p-2.5 sm:p-3 shadow-sm border border-gray-200 flex flex-col gap-2.5">
+        <!-- 첫째 줄: 색상 팔레트 -->
+        <div class="flex items-center justify-between gap-2 overflow-x-auto py-1 px-1">
+          <div id="colorPalette" class="flex items-center gap-2 shrink-0">
+            <!-- JS로 색상 버튼 생성 -->
+          </div>
+          <!-- 커스텀 컬러 피커 -->
+          <label title="직접 색상 고르기"
+            class="shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-gray-300 overflow-hidden cursor-pointer flex items-center justify-center bg-gradient-to-tr from-pink-400 via-yellow-300 to-cyan-400 shadow-sm">
+            <input type="color" id="customColorPicker" value="#FF6B6B" onchange="selectCustomColor(this.value)"
+              class="opacity-0 w-full h-full cursor-pointer" />
+          </label>
+        </div>
+
+        <!-- 둘째 줄: 브러시 굵기 & 지우개 & 실행취소 -->
+        <div class="flex items-center justify-between gap-2 border-t border-gray-100 pt-2">
+          <!-- 브러시 굵기 -->
+          <div class="flex items-center gap-1.5" id="brushSizeGroup">
+            <button type="button" data-size="3" onclick="selectBrushSize(3)" title="얇게"
+              class="size-btn w-9 h-9 rounded-xl border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition">
+              <span class="w-1.5 h-1.5 rounded-full bg-gray-800"></span>
+            </button>
+            <button type="button" data-size="7" onclick="selectBrushSize(7)" title="보통"
+              class="size-btn w-9 h-9 rounded-xl border-2 border-emerald-500 bg-emerald-50 flex items-center justify-center transition">
+              <span class="w-3 h-3 rounded-full bg-gray-800"></span>
+            </button>
+            <button type="button" data-size="14" onclick="selectBrushSize(14)" title="굵게"
+              class="size-btn w-9 h-9 rounded-xl border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition">
+              <span class="w-4 h-4 rounded-full bg-gray-800"></span>
+            </button>
+            <button type="button" data-size="24" onclick="selectBrushSize(24)" title="아주 굵게"
+              class="size-btn w-9 h-9 rounded-xl border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition">
+              <span class="w-6 h-6 rounded-full bg-gray-800"></span>
+            </button>
+          </div>
+
+          <!-- 도구 버튼: 브러시, 지우개, 내 턴 실행 취소 -->
+          <div class="flex items-center gap-1.5">
+            <button type="button" id="toolBrushBtn" onclick="setTool('brush')"
+              class="px-3 py-2 rounded-xl text-xs sm:text-sm font-bold bg-emerald-500 text-white flex items-center gap-1 shadow-sm transition">
+              <span>🖌️</span><span class="hidden sm:inline">브러시</span>
+            </button>
+            <button type="button" id="toolEraserBtn" onclick="setTool('eraser')"
+              class="px-3 py-2 rounded-xl text-xs sm:text-sm font-bold bg-gray-100 text-gray-700 hover:bg-gray-200 flex items-center gap-1 transition">
+              <span>🧽</span><span class="hidden sm:inline">지우개</span>
+            </button>
+            <button type="button" id="undoBtn" onclick="undoLastStroke()"
+              class="px-3 py-2 rounded-xl text-xs sm:text-sm font-bold bg-amber-100 text-amber-900 hover:bg-amber-200 flex items-center gap-1 transition">
+              <span>↩️</span><span>되돌리기</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 3. 완성 작품 감상 & 갤러리 화면 ==================== -->
+    <section id="resultScreen" class="hidden animate-enter bg-cream rounded-3xl shadow-card border-2 border-amber-200/80 overflow-hidden">
+      <div class="p-5 sm:p-7 space-y-5">
+        <!-- 축하 타이틀 -->
+        <div class="text-center space-y-1">
+          <div class="inline-flex items-center gap-1.5 bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1 rounded-full">
+            <span>🎉</span><span>협동 명작 탄생!</span><span>🎉</span>
+          </div>
+          <h2 class="font-jua text-2xl sm:text-3xl text-gray-800" id="resultThemeTitle">자유 주제 작품</h2>
+          <p class="text-xs sm:text-sm text-gray-500">
+            함께 그린 작가들: <span id="resultArtistsList" class="font-bold text-gray-700"></span>
+          </p>
+        </div>
+
+        <!-- 완성 액자 프레임 -->
+        <div class="relative bg-white p-3 sm:p-4 rounded-2xl border-4 border-amber-300/80 shadow-md max-w-2xl mx-auto">
+          <div class="relative aspect-[4/3] w-full bg-white rounded-xl overflow-hidden border border-gray-100">
+            <img id="finalArtworkImg" src="" alt="완성된 이어그리기 작품" class="w-full h-full object-contain" />
+            <!-- 리플레이 중 표시 배지 -->
+            <div id="replayBadge" class="hidden absolute top-3 left-3 bg-black/75 text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-red-400 animate-ping"></span>
+              <span id="replayStepText">1단계 감상 중...</span>
+            </div>
+          </div>
+
+          <!-- 액자 하단 명패 -->
+          <div class="mt-3 flex items-center justify-between text-xs text-gray-500 px-1">
+            <span class="font-jua text-sm text-gray-700">🎨 이어그리기 갤러리</span>
+            <span class="bg-mint text-mintDark font-bold px-2.5 py-0.5 rounded-full">기획: 박지은</span>
+          </div>
+        </div>
+
+        <!-- 단계별 변화 썸네일 스트립 -->
+        <div class="space-y-2 max-w-2xl mx-auto">
+          <div class="flex items-center justify-between">
+            <h3 class="font-jua text-base text-gray-700">📸 차례별 그림 변화 과정</h3>
+            <button type="button" onclick="playStepReplay()" id="replayBtn"
+              class="text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-xl border border-indigo-200 transition flex items-center gap-1">
+              <span>▶️</span><span>과정 자동 재생</span>
+            </button>
+          </div>
+          <div id="stepSnapshotsContainer" class="flex gap-2.5 overflow-x-auto pb-2">
+            <!-- JS로 단계별 스냅샷 카드 렌더링 -->
+          </div>
+        </div>
+
+        <!-- 액션 버튼 모음 -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl mx-auto pt-1">
+          <button type="button" onclick="downloadArtwork()"
+            class="pop-btn py-3.5 px-4 rounded-2xl bg-amber-400 hover:bg-amber-500 text-amber-950 font-jua text-lg flex items-center justify-center gap-2">
+            <span>💾</span>
+            <span>액자 이미지 저장 (PNG)</span>
+          </button>
+          <button type="button" onclick="resetToLobby()"
+            class="pop-btn py-3.5 px-4 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-jua text-lg flex items-center justify-center gap-2">
+            <span>🔄</span>
+            <span>새 게임 다시 하기</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 푸터 -->
+  <footer class="w-full text-center py-3 text-xs text-gray-400">
+    작은 생각, 함께 나누기 · <span class="font-bold text-gray-500">이어그리기</span> (기획: 박지은)
+  </footer>
+
+  <!-- 커스텀 확인/알림 모달 (alert/confirm 대체) -->
+  <div id="customModal" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-xs w-full p-6 shadow-xl border border-gray-100 text-center space-y-4 animate-enter">
+      <div class="text-3xl" id="modalEmoji">🎨</div>
+      <h3 class="font-jua text-xl text-gray-800" id="modalTitle">알림</h3>
+      <p class="text-sm text-gray-600 leading-relaxed" id="modalMessage">메시지 내용</p>
+      <div class="flex gap-2 pt-1" id="modalButtons">
+        <!-- JS로 버튼 구성 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 색종이 효과 캔버스 -->
+  <canvas id="confettiCanvas" class="fixed inset-0 pointer-events-none z-40 hidden"></canvas>
+
+  <script>
+    /* ==========================================================================
+       1. 게임 상태 및 데이터 정의
+       ========================================================================== */
+    const PLAYER_COLORS = [
+      '#10B981', // 에메랄드
+      '#3B82F6', // 블루
+      '#F59E0B', // 앰버
+      '#EC4899', // 핑크
+      '#8B5CF6', // 바이올렛
+      '#EF4444'  // 레드
+    ];
+
+    const PALETTE_COLORS = [
+      '#2D3436', // 검정
+      '#FF595E', // 빨강
+      '#FF924C', // 주황
+      '#FFCA3A', // 노랑
+      '#8AC926', // 연두
+      '#1982C4', // 파랑
+      '#6A4C93', // 보라
+      '#FF70A6', // 분홍
+      '#8D5B4C', // 갈색
+      '#4ECDC4', // 민트
+      '#A0C4FF', // 하늘
+      '#FFFFFF'  // 흰색
+    ];
+
+    const THEME_PROMPTS = [
+      '우주 여행을 떠난 고양이 🚀',
+      '무지개 아이스크림 성 🍦',
+      '바닷속 문어 파티 🐙',
+      '구름 위의 놀이터 ☁️',
+      '공룡이 사는 미래 도시 🦕',
+      '마법사의 비밀 정원 🪄',
+      '하늘을 나는 거북이 버스 🐢',
+      '과자로 만든 기차 🚂',
+      '숲속 동물들의 음악회 🎶',
+      '로봇 요리사의 레스토랑 🤖',
+      '별빛이 내리는 캠핑장 ⛺',
+      '자유 주제 (마음대로 그려요!)'
+    ];
+
+    const state = {
+      playerCount: 3,
+      playerNames: ['플레이어 1', '플레이어 2', '플레이어 3', '플레이어 4', '플레이어 5', '플레이어 6'],
+      timeLimit: 30,
+      rounds: 1,
+      theme: '자유 주제 (마음대로 그려요!)',
+
+      // 진행 상태
+      turns: [],           // [{ playerIndex, playerName, round }]
+      currentTurnIndex: 0,
+      timeLeft: 30,
+      timerInterval: null,
+      isDrawingPhase: false,
+
+      // 캔버스 및 브러시 상태
+      currentColor: '#2D3436',
+      brushSize: 7,
+      tool: 'brush', // 'brush' | 'eraser'
+      isPointerDown: false,
+      lastX: 0,
+      lastY: 0,
+
+      // 실행 취소(현재 턴 전용) 및 스냅샷 히스토리
+      turnStartSnapshot: null, // 현재 턴 시작 시점 ImageData
+      currentTurnStrokes: [],  // 현재 턴에서 그린 스트로크 배열
+      turnSnapshots: [],       // 각 턴 종료 후 저장된 { playerName, round, dataUrl }
+
+      // 사운드 & 리플레이
+      soundEnabled: true,
+      replayTimer: null
+    };
+
+    /* ==========================================================================
+       2. Web Audio API 효과음 합성기 (외부 파일 불필요)
+       ========================================================================== */
+    let audioCtx = null;
+
+    function initAudio() {
+      if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) {
+          audioCtx = new AudioContext();
+        }
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function playTone(freq, type = 'sine', duration = 0.15, gainVal = 0.12, delay = 0) {
+      if (!state.soundEnabled) return;
+      try {
+        initAudio();
+        if (!audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime + delay);
+
+        gain.gain.setValueAtTime(0.001, audioCtx.currentTime + delay);
+        gain.gain.exponentialRampToValueAtTime(gainVal, audioCtx.currentTime + delay + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + delay + duration);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(audioCtx.currentTime + delay);
+        osc.stop(audioCtx.currentTime + delay + duration + 0.02);
+      } catch (e) {
+        // 오디오 차단 환경 무시
+      }
+    }
+
+    function playSoundStartTurn() {
+      playTone(523.25, 'triangle', 0.14, 0.14, 0);     // 도
+      playTone(659.25, 'triangle', 0.14, 0.14, 0.09);  // 미
+      playTone(783.99, 'triangle', 0.22, 0.16, 0.18);  // 솔
+    }
+
+    function playSoundTick() {
+      playTone(880, 'sine', 0.07, 0.08, 0);
+    }
+
+    function playSoundTurnEnd() {
+      playTone(659.25, 'sine', 0.15, 0.12, 0);
+      playTone(523.25, 'sine', 0.25, 0.12, 0.12);
+    }
+
+    function playSoundFanfare() {
+      const notes = [523.25, 659.25, 783.99, 1046.50];
+      notes.forEach((freq, idx) => {
+        playTone(freq, 'triangle', 0.25, 0.15, idx * 0.11);
+      });
+    }
+
+    function toggleSound() {
+      state.soundEnabled = !state.soundEnabled;
+      document.getElementById('soundIcon').textContent = state.soundEnabled ? '🔊' : '🔇';
+      document.getElementById('soundLabel').textContent = state.soundEnabled ? '소리 켜짐' : '소리 꺼짐';
+      if (state.soundEnabled) {
+        playTone(660, 'sine', 0.1, 0.1);
+      }
+    }
+
+    /* ==========================================================================
+       3. 로비(게임 설정) 로직
+       ========================================================================== */
+    function renderPlayerInputs() {
+      const container = document.getElementById('playerInputsList');
+      document.getElementById('playerCountDisplay').textContent = `${state.playerCount}명`;
+      container.innerHTML = '';
+
+      for (let i = 0; i < state.playerCount; i++) {
+        const color = PLAYER_COLORS[i % PLAYER_COLORS.length];
+        const row = document.createElement('div');
+        row.className = 'flex items-center gap-2';
+        row.innerHTML = `
+          <span class="w-7 h-7 rounded-full text-white font-jua text-sm flex items-center justify-center shrink-0 shadow-xs"
+                style="background-color: ${color}">
+            ${i + 1}
+          </span>
+          <input type="text" maxlength="12" value="${escapeHtml(state.playerNames[i])}"
+            onchange="updatePlayerName(${i}, this.value)"
+            placeholder="플레이어 ${i + 1}"
+            class="flex-1 px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-200 text-sm font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white transition" />
+        `;
+        container.appendChild(row);
+      }
+    }
+
+    function changePlayerCount(delta) {
+      const next = state.playerCount + delta;
+      if (next < 2 || next > 6) return;
+      state.playerCount = next;
+      renderPlayerInputs();
+      playTone(500 + next * 40, 'sine', 0.08, 0.08);
+    }
+
+    function updatePlayerName(index, val) {
+      const trimmed = val.trim();
+      state.playerNames[index] = trimmed || `플레이어 ${index + 1}`;
+    }
+
+    function selectTime(seconds) {
+      state.timeLimit = seconds;
+      document.querySelectorAll('.time-btn').forEach(btn => {
+        const t = Number(btn.dataset.time);
+        if (t === seconds) {
+          btn.className = 'time-btn py-2 rounded-xl border-2 border-amber-400 bg-amber-50 font-bold text-sm text-amber-800 transition';
+        } else {
+          btn.className = 'time-btn py-2 rounded-xl border-2 border-gray-200 font-bold text-sm text-gray-600 hover:border-amber-400 transition';
+        }
+      });
+      playTone(600, 'sine', 0.07, 0.07);
+    }
+
+    function selectRounds(rounds) {
+      state.rounds = rounds;
+      document.querySelectorAll('.round-btn').forEach(btn => {
+        const r = Number(btn.dataset.rounds);
+        if (r === rounds) {
+          btn.className = 'round-btn py-2 rounded-xl border-2 border-emerald-500 bg-emerald-50 font-bold text-sm text-emerald-800 transition';
+        } else {
+          btn.className = 'round-btn py-2 rounded-xl border-2 border-gray-200 font-bold text-sm text-gray-600 hover:border-emerald-400 transition';
+        }
+      });
+      playTone(650, 'sine', 0.07, 0.07);
+    }
+
+    function pickRandomTheme() {
+      const current = document.getElementById('themeInput').value;
+      const candidates = THEME_PROMPTS.filter(t => t !== current);
+      const picked = candidates[Math.floor(Math.random() * candidates.length)];
+      document.getElementById('themeInput').value = picked;
+      playTone(740, 'triangle', 0.1, 0.1);
+    }
+
+    /* ==========================================================================
+       4. 캔버스 초기화 및 드로잉 엔진
+       ========================================================================== */
+    const canvas = document.getElementById('drawingCanvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+    // 고정 논리 해상도(1200x900, 4:3)를 사용하여 리사이즈 시에도 그림이 깨지거나 잘리지 않게 유지
+    const LOGICAL_WIDTH = 1200;
+    const LOGICAL_HEIGHT = 900;
+
+    function setupCanvas() {
+      canvas.width = LOGICAL_WIDTH;
+      canvas.height = LOGICAL_HEIGHT;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+    }
+
+    function getCanvasCoords(e) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = LOGICAL_WIDTH / rect.width;
+      const scaleY = LOGICAL_HEIGHT / rect.height;
+      return {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY
+      };
+    }
+
+    function startStroke(e) {
+      if (!state.isDrawingPhase) return;
+      if (e.button !== undefined && e.button !== 0) return;
+
+      canvas.setPointerCapture(e.pointerId);
+      state.isPointerDown = true;
+      const pos = getCanvasCoords(e);
+      state.lastX = pos.x;
+      state.lastY = pos.y;
+
+      const strokeColor = state.tool === 'eraser' ? '#FFFFFF' : state.currentColor;
+      const strokeWidth = state.tool === 'eraser' ? state.brushSize * 2.2 : state.brushSize;
+
+      const stroke = {
+        color: strokeColor,
+        size: strokeWidth,
+        points: [{ x: pos.x, y: pos.y }]
+      };
+      state.currentTurnStrokes.push(stroke);
+
+      // 점 찍기 지원
+      ctx.beginPath();
+      ctx.fillStyle = strokeColor;
+      ctx.arc(pos.x, pos.y, strokeWidth / 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function moveStroke(e) {
+      if (!state.isPointerDown || !state.isDrawingPhase) return;
+      const pos = getCanvasCoords(e);
+
+      const currentStroke = state.currentTurnStrokes[state.currentTurnStrokes.length - 1];
+      if (!currentStroke) return;
+
+      currentStroke.points.push({ x: pos.x, y: pos.y });
+
+      ctx.beginPath();
+      ctx.strokeStyle = currentStroke.color;
+      ctx.lineWidth = currentStroke.size;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.moveTo(state.lastX, state.lastY);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+
+      state.lastX = pos.x;
+      state.lastY = pos.y;
+    }
+
+    function endStroke(e) {
+      if (!state.isPointerDown) return;
+      state.isPointerDown = false;
+      try {
+        canvas.releasePointerCapture(e.pointerId);
+      } catch (err) {}
+    }
+
+    canvas.addEventListener('pointerdown', startStroke);
+    canvas.addEventListener('pointermove', moveStroke);
+    canvas.addEventListener('pointerup', endStroke);
+    canvas.addEventListener('pointercancel', endStroke);
+
+    function undoLastStroke() {
+      if (!state.isDrawingPhase || state.currentTurnStrokes.length === 0) return;
+      state.currentTurnStrokes.pop();
+
+      // 현재 턴 시작 이미지 복원 후 남은 스트로크 다시 그리기 (이전 플레이어 그림 완벽 보호)
+      if (state.turnStartSnapshot) {
+        ctx.putImageData(state.turnStartSnapshot, 0, 0);
+      }
+
+      for (const stroke of state.currentTurnStrokes) {
+        if (stroke.points.length === 0) continue;
+        if (stroke.points.length === 1) {
+          ctx.beginPath();
+          ctx.fillStyle = stroke.color;
+          ctx.arc(stroke.points[0].x, stroke.points[0].y, stroke.size / 2, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          ctx.beginPath();
+          ctx.strokeStyle = stroke.color;
+          ctx.lineWidth = stroke.size;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+          for (let i = 1; i < stroke.points.length; i++) {
+            ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+          }
+          ctx.stroke();
+        }
+      }
+      playTone(420, 'sine', 0.08, 0.08);
+    }
+
+    /* ==========================================================================
+       5. 팔레트 및 도구 UI 제어
+       ========================================================================== */
+    function renderColorPalette() {
+      const container = document.getElementById('colorPalette');
+      container.innerHTML = '';
+
+      PALETTE_COLORS.forEach(hex => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.color = hex;
+        btn.onclick = () => selectColor(hex);
+        const isWhite = hex.toUpperCase() === '#FFFFFF';
+        btn.className = `color-swatch w-7 h-7 sm:w-8 sm:h-8 rounded-full transition transform shrink-0 ${
+          isWhite ? 'border-2 border-gray-300' : 'border border-black/10'
+        } ${hex === state.currentColor && state.tool === 'brush' ? 'selected' : ''}`;
+        btn.style.backgroundColor = hex;
+        container.appendChild(btn);
+      });
+    }
+
+    function selectColor(hex) {
+      state.currentColor = hex;
+      setTool('brush');
+      document.querySelectorAll('.color-swatch').forEach(btn => {
+        if (btn.dataset.color.toUpperCase() === hex.toUpperCase()) {
+          btn.classList.add('selected');
+        } else {
+          btn.classList.remove('selected');
+        }
+      });
+    }
+
+    function selectCustomColor(hex) {
+      state.currentColor = hex;
+      setTool('brush');
+      document.querySelectorAll('.color-swatch').forEach(btn => btn.classList.remove('selected'));
+    }
+
+    function selectBrushSize(size) {
+      state.brushSize = size;
+      document.querySelectorAll('.size-btn').forEach(btn => {
+        const s = Number(btn.dataset.size);
+        if (s === size) {
+          btn.className = 'size-btn w-9 h-9 rounded-xl border-2 border-emerald-500 bg-emerald-50 flex items-center justify-center transition';
+        } else {
+          btn.className = 'size-btn w-9 h-9 rounded-xl border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition';
+        }
+      });
+    }
+
+    function setTool(toolName) {
+      state.tool = toolName;
+      const brushBtn = document.getElementById('toolBrushBtn');
+      const eraserBtn = document.getElementById('toolEraserBtn');
+
+      if (toolName === 'brush') {
+        brushBtn.className = 'px-3 py-2 rounded-xl text-xs sm:text-sm font-bold bg-emerald-500 text-white flex items-center gap-1 shadow-sm transition';
+        eraserBtn.className = 'px-3 py-2 rounded-xl text-xs sm:text-sm font-bold bg-gray-100 text-gray-700 hover:bg-gray-200 flex items-center gap-1 transition';
+        document.querySelectorAll('.color-swatch').forEach(btn => {
+          if (btn.dataset.color.toUpperCase() === state.currentColor.toUpperCase()) {
+            btn.classList.add('selected');
+          }
+        });
+      } else {
+        eraserBtn.className = 'px-3 py-2 rounded-xl text-xs sm:text-sm font-bold bg-amber-500 text-white flex items-center gap-1 shadow-sm transition';
+        brushBtn.className = 'px-3 py-2 rounded-xl text-xs sm:text-sm font-bold bg-gray-100 text-gray-700 hover:bg-gray-200 flex items-center gap-1 transition';
+        document.querySelectorAll('.color-swatch').forEach(btn => btn.classList.remove('selected'));
+      }
+    }
+
+    /* ==========================================================================
+       6. 게임 흐름 및 턴 진행 로직
+       ========================================================================== */
+    function startGame() {
+      initAudio();
+
+      // 참가자 이름 확정
+      const activePlayers = [];
+      for (let i = 0; i < state.playerCount; i++) {
+        const name = (state.playerNames[i] || '').trim() || `플레이어 ${i + 1}`;
+        state.playerNames[i] = name;
+        activePlayers.push({ index: i, name });
+      }
+
+      // 주제 확정
+      const rawTheme = document.getElementById('themeInput').value.trim();
+      state.theme = rawTheme || '자유 주제 (마음대로 그려요!)';
+
+      // 전체 턴 큐 생성
+      state.turns = [];
+      for (let r = 1; r <= state.rounds; r++) {
+        for (const p of activePlayers) {
+          state.turns.push({
+            playerIndex: p.index,
+            playerName: p.name,
+            round: r
+          });
+        }
+      }
+
+      state.currentTurnIndex = 0;
+      state.turnSnapshots = [];
+
+      // 화면 전환
+      document.getElementById('lobbyScreen').classList.add('hidden');
+      document.getElementById('resultScreen').classList.add('hidden');
+      document.getElementById('gameScreen').classList.remove('hidden');
+      document.getElementById('gameScreen').classList.add('flex');
+      document.getElementById('homeResetBtn').classList.remove('hidden');
+
+      document.getElementById('activeThemeText').textContent = state.theme;
+      document.getElementById('activeThemeTextMobile').textContent = state.theme;
+
+      setupCanvas();
+      renderColorPalette();
+      selectColor('#2D3436');
+      selectBrushSize(7);
+
+      prepareTurnOverlay();
+    }
+
+    function prepareTurnOverlay() {
+      clearInterval(state.timerInterval);
+      state.isDrawingPhase = false;
+      state.isPointerDown = false;
+
+      const turn = state.turns[state.currentTurnIndex];
+      const totalTurns = state.turns.length;
+      const color = PLAYER_COLORS[turn.playerIndex % PLAYER_COLORS.length];
+
+      // 상단 바 업데이트
+      const badge = document.getElementById('currentPlayerBadge');
+      badge.style.backgroundColor = color;
+      document.getElementById('currentPlayerName').textContent = turn.playerName;
+      document.getElementById('turnIndicator').textContent = `${state.currentTurnIndex + 1} / ${totalTurns} 턴`;
+
+      state.timeLeft = state.timeLimit;
+      updateTimerUI();
+
+      // 오버레이 업데이트
+      document.getElementById('overlayTurnBadge').textContent = `${state.currentTurnIndex + 1}번째 순서 (총 ${totalTurns}턴)`;
+      const overlayName = document.getElementById('overlayPlayerName');
+      overlayName.textContent = turn.playerName;
+      overlayName.style.color = color;
+
+      if (state.currentTurnIndex === 0) {
+        document.getElementById('overlayHelperText').textContent = '첫 번째 화가님, 준비되셨나요?';
+        document.getElementById('overlayInstruction').innerHTML =
+          `제한시간 <strong class="text-gray-900">${state.timeLimit}초</strong> 동안 원하는 그림의 시작을 자유롭게 그려주세요!`;
+      } else {
+        const prevPlayer = state.turns[state.currentTurnIndex - 1].playerName;
+        document.getElementById('overlayHelperText').textContent = `${prevPlayer}님의 그림을 이어받았어요!`;
+        document.getElementById('overlayInstruction').innerHTML =
+          `앞사람의 그림을 보고 <strong class="text-gray-900">${state.timeLimit}초</strong> 동안 재미있게 이어 그려주세요!`;
+      }
+
+      document.getElementById('turnOverlay').classList.remove('hidden');
+    }
+
+    function beginTurnDrawing() {
+      initAudio();
+      playSoundStartTurn();
+
+      document.getElementById('turnOverlay').classList.add('hidden');
+
+      // 현재 턴 시작 시점 캔버스 상태 저장 (실행 취소용)
+      state.turnStartSnapshot = ctx.getImageData(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+      state.currentTurnStrokes = [];
+      state.isDrawingPhase = true;
+
+      state.timeLeft = state.timeLimit;
+      updateTimerUI();
+
+      clearInterval(state.timerInterval);
+      state.timerInterval = setInterval(() => {
+        state.timeLeft--;
+        updateTimerUI();
+
+        if (state.timeLeft <= 5 && state.timeLeft > 0) {
+          playSoundTick();
+        }
+
+        if (state.timeLeft <= 0) {
+          finishCurrentTurn();
+        }
+      }, 1000);
+    }
+
+    function updateTimerUI() {
+      const display = document.getElementById('timerDisplay');
+      const box = document.getElementById('timerBox');
+      display.textContent = Math.max(0, state.timeLeft);
+
+      if (state.timeLeft <= 5 && state.isDrawingPhase) {
+        box.className = 'flex items-center gap-1.5 bg-red-100 px-3.5 py-1 rounded-xl border border-red-300 timer-urgent';
+        display.className = 'font-jua text-xl sm:text-2xl text-red-600 tabular-nums';
+      } else if (state.timeLeft <= 10 && state.isDrawingPhase) {
+        box.className = 'flex items-center gap-1.5 bg-amber-100 px-3.5 py-1 rounded-xl border border-amber-300';
+        display.className = 'font-jua text-xl sm:text-2xl text-amber-700 tabular-nums';
+      } else {
+        box.className = 'flex items-center gap-1.5 bg-gray-100 px-3.5 py-1 rounded-xl border border-gray-200';
+        display.className = 'font-jua text-xl sm:text-2xl text-gray-800 tabular-nums';
+      }
+    }
+
+    function finishCurrentTurn() {
+      clearInterval(state.timerInterval);
+      state.isDrawingPhase = false;
+      state.isPointerDown = false;
+
+      // 현재 턴 완료 스냅샷 저장
+      const turn = state.turns[state.currentTurnIndex];
+      state.turnSnapshots.push({
+        step: state.currentTurnIndex + 1,
+        playerName: turn.playerName,
+        playerIndex: turn.playerIndex,
+        dataUrl: canvas.toDataURL('image/png')
+      });
+
+      state.currentTurnIndex++;
+
+      if (state.currentTurnIndex < state.turns.length) {
+        playSoundTurnEnd();
+        prepareTurnOverlay();
+      } else {
+        showResultScreen();
+      }
+    }
+
+    /* ==========================================================================
+       7. 결과 화면, 단계별 리플레이 및 PNG 액자 다운로드
+       ========================================================================== */
+    function showResultScreen() {
+      playSoundFanfare();
+      launchConfetti();
+
+      document.getElementById('gameScreen').classList.add('hidden');
+      document.getElementById('gameScreen').classList.remove('flex');
+      document.getElementById('resultScreen').classList.remove('hidden');
+
+      document.getElementById('resultThemeTitle').textContent = `「${state.theme}」`;
+
+      const uniqueArtists = state.playerNames.slice(0, state.playerCount);
+      document.getElementById('resultArtistsList').textContent = uniqueArtists.join(' · ');
+
+      const finalDataUrl = state.turnSnapshots[state.turnSnapshots.length - 1].dataUrl;
+      document.getElementById('finalArtworkImg').src = finalDataUrl;
+      document.getElementById('replayBadge').classList.add('hidden');
+
+      renderStepSnapshots();
+    }
+
+    function renderStepSnapshots() {
+      const container = document.getElementById('stepSnapshotsContainer');
+      container.innerHTML = '';
+
+      state.turnSnapshots.forEach((snap, idx) => {
+        const color = PLAYER_COLORS[snap.playerIndex % PLAYER_COLORS.length];
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.onclick = () => previewSnapshot(idx);
+        card.className = 'shrink-0 w-28 sm:w-32 bg-white rounded-xl p-1.5 border-2 border-gray-200 hover:border-amber-400 transition text-left space-y-1 shadow-xs';
+        card.innerHTML = `
+          <div class="aspect-[4/3] w-full rounded-lg overflow-hidden bg-gray-50 border border-gray-100">
+            <img src="${snap.dataUrl}" alt="${snap.step}단계" class="w-full h-full object-contain" />
+          </div>
+          <div class="flex items-center gap-1 px-0.5">
+            <span class="w-4 h-4 rounded-full text-[10px] text-white font-bold flex items-center justify-center shrink-0"
+                  style="background-color: ${color}">${snap.step}</span>
+            <span class="text-xs font-bold text-gray-700 truncate">${escapeHtml(snap.playerName)}</span>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function previewSnapshot(index) {
+      stopReplay();
+      const snap = state.turnSnapshots[index];
+      if (!snap) return;
+      document.getElementById('finalArtworkImg').src = snap.dataUrl;
+
+      const badge = document.getElementById('replayBadge');
+      const text = document.getElementById('replayStepText');
+      if (index === state.turnSnapshots.length - 1) {
+        badge.classList.add('hidden');
+      } else {
+        badge.classList.remove('hidden');
+        text.textContent = `${snap.step}단계: ${snap.playerName}님의 차례 후`;
+      }
+    }
+
+    function playStepReplay() {
+      stopReplay();
+      if (state.turnSnapshots.length === 0) return;
+
+      let stepIdx = 0;
+      const badge = document.getElementById('replayBadge');
+      const text = document.getElementById('replayStepText');
+      const img = document.getElementById('finalArtworkImg');
+
+      badge.classList.remove('hidden');
+
+      const showNext = () => {
+        const snap = state.turnSnapshots[stepIdx];
+        img.src = snap.dataUrl;
+        text.textContent = `${snap.step} / ${state.turnSnapshots.length}단계 · ${snap.playerName}`;
+        playTone(480 + stepIdx * 70, 'sine', 0.1, 0.08);
+
+        stepIdx++;
+        if (stepIdx >= state.turnSnapshots.length) {
+          state.replayTimer = setTimeout(() => {
+            badge.classList.add('hidden');
+          }, 1400);
+        } else {
+          state.replayTimer = setTimeout(showNext, 1100);
+        }
+      };
+
+      showNext();
+    }
+
+    function stopReplay() {
+      if (state.replayTimer) {
+        clearTimeout(state.replayTimer);
+        state.replayTimer = null;
+      }
+    }
+
+    function downloadArtwork() {
+      // 액자 프레임을 포함한 예쁜 기념 이미지 생성
+      const exportCanvas = document.createElement('canvas');
+      const pad = 48;
+      const footerH = 110;
+      exportCanvas.width = LOGICAL_WIDTH + pad * 2;
+      exportCanvas.height = LOGICAL_HEIGHT + pad + footerH;
+      const eCtx = exportCanvas.getContext('2d');
+
+      // 배경
+      eCtx.fillStyle = '#FFFDF7';
+      eCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+
+      // 테두리
+      eCtx.strokeStyle = '#FCD34D';
+      eCtx.lineWidth = 10;
+      eCtx.strokeRect(16, 16, exportCanvas.width - 32, exportCanvas.height - 32);
+
+      // 그림 영역 배경 및 테두리
+      eCtx.fillStyle = '#FFFFFF';
+      eCtx.fillRect(pad, pad, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+      eCtx.drawImage(canvas, pad, pad, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+      eCtx.strokeStyle = '#E5E7EB';
+      eCtx.lineWidth = 3;
+      eCtx.strokeRect(pad, pad, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+
+      // 하단 텍스트
+      const artists = state.playerNames.slice(0, state.playerCount).join(', ');
+      eCtx.fillStyle = '#2D3436';
+      eCtx.font = 'bold 28px "Noto Sans KR", sans-serif';
+      eCtx.fillText(`🎨 이어그리기 - ${state.theme}`, pad, LOGICAL_HEIGHT + pad + 48);
+
+      eCtx.fillStyle = '#6B7280';
+      eCtx.font = '500 21px "Noto Sans KR", sans-serif';
+      eCtx.fillText(`함께 그린 작가: ${artists}`, pad, LOGICAL_HEIGHT + pad + 84);
+
+      eCtx.fillStyle = '#2E7D52';
+      eCtx.font = 'bold 22px "Noto Sans KR", sans-serif';
+      eCtx.textAlign = 'right';
+      eCtx.fillText('기획: 박지은', exportCanvas.width - pad, LOGICAL_HEIGHT + pad + 84);
+
+      const link = document.createElement('a');
+      link.download = `이어그리기_${Date.now()}.png`;
+      link.href = exportCanvas.toDataURL('image/png');
+      link.click();
+    }
+
+    /* ==========================================================================
+       8. 모달 및 초기화 유틸리티
+       ========================================================================== */
+    function confirmResetToLobby() {
+      showModal({
+        emoji: '🏠',
+        title: '처음 화면으로 돌아갈까요?',
+        message: '현재 그리고 있는 그림은 저장되지 않고 초기화됩니다.',
+        confirmText: '네, 돌아갈래요',
+        cancelText: '계속 그리기',
+        onConfirm: () => {
+          resetToLobby();
+        }
+      });
+    }
+
+    function resetToLobby() {
+      clearInterval(state.timerInterval);
+      stopReplay();
+      state.isDrawingPhase = false;
+
+      document.getElementById('gameScreen').classList.add('hidden');
+      document.getElementById('gameScreen').classList.remove('flex');
+      document.getElementById('resultScreen').classList.add('hidden');
+      document.getElementById('homeResetBtn').classList.add('hidden');
+      document.getElementById('lobbyScreen').classList.remove('hidden');
+    }
+
+    function showModal({ emoji = '🎨', title, message, confirmText = '확인', cancelText = null, onConfirm = null }) {
+      const modal = document.getElementById('customModal');
+      document.getElementById('modalEmoji').textContent = emoji;
+      document.getElementById('modalTitle').textContent = title;
+      document.getElementById('modalMessage').textContent = message;
+
+      const btnContainer = document.getElementById('modalButtons');
+      btnContainer.innerHTML = '';
+
+      if (cancelText) {
+        const cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.textContent = cancelText;
+        cancelBtn.className = 'flex-1 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-sm transition';
+        cancelBtn.onclick = () => modal.classList.add('hidden');
+        btnContainer.appendChild(cancelBtn);
+      }
+
+      const okBtn = document.createElement('button');
+      okBtn.type = 'button';
+      okBtn.textContent = confirmText;
+      okBtn.className = 'flex-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-sm transition';
+      okBtn.onclick = () => {
+        modal.classList.add('hidden');
+        if (onConfirm) onConfirm();
+      };
+      btnContainer.appendChild(okBtn);
+
+      modal.classList.remove('hidden');
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    /* ==========================================================================
+       9. 축하 색종이(Confetti) 애니메이션
+       ========================================================================== */
+    function launchConfetti() {
+      const cCanvas = document.getElementById('confettiCanvas');
+      cCanvas.classList.remove('hidden');
+      cCanvas.width = window.innerWidth;
+      cCanvas.height = window.innerHeight;
+      const cCtx = cCanvas.getContext('2d');
+
+      const colors = ['#FF6B6B', '#FFD166', '#4ECDC4', '#10B981', '#8B5CF6', '#FF9F1C'];
+      const pieces = Array.from({ length: 85 }, () => ({
+        x: Math.random() * cCanvas.width,
+        y: Math.random() * -cCanvas.height,
+        w: 8 + Math.random() * 8,
+        h: 6 + Math.random() * 6,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        vy: 2.5 + Math.random() * 3.5,
+        vx: (Math.random() - 0.5) * 2.5,
+        rot: Math.random() * Math.PI * 2,
+        vRot: (Math.random() - 0.5) * 0.15
+      }));
+
+      let frame = 0;
+      function animateConfetti() {
+        cCtx.clearRect(0, 0, cCanvas.width, cCanvas.height);
+        pieces.forEach(p => {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.rot += p.vRot;
+
+          cCtx.save();
+          cCtx.translate(p.x, p.y);
+          cCtx.rotate(p.rot);
+          cCtx.fillStyle = p.color;
+          cCtx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+          cCtx.restore();
+        });
+
+        frame++;
+        if (frame < 160) {
+          requestAnimationFrame(animateConfetti);
+        } else {
+          cCanvas.classList.add('hidden');
+        }
+      }
+      animateConfetti();
+    }
+
+    // 초기 로비 렌더링
+    window.addEventListener('DOMContentLoaded', () => {
+      renderPlayerInputs();
+    });
+  </script>
+</body>
+</html>

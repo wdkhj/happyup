@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>무한 수학 도전 - 기획: 박서원</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    /* 게임 전용 폰트 및 커스텀 스타일 */
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 50%, #fef9c3 100%);
+      touch-action: manipulation;
+      user-select: none;
+    }
+    .font-game {
+      font-family: 'Jua', sans-serif;
+      letter-spacing: 0.03em;
+    }
+
+    /* 3D 입체 게임 버튼 */
+    .btn-game {
+      transition: all 0.1s ease;
+    }
+    .btn-game:active:not(:disabled) {
+      transform: translateY(4px);
+      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2) !important;
+    }
+    .btn-blue {
+      background: linear-gradient(to bottom, #3b82f6, #2563eb);
+      box-shadow: 0 5px 0 #1d4ed8;
+    }
+    .btn-orange {
+      background: linear-gradient(to bottom, #fb923c, #f97316);
+      box-shadow: 0 5px 0 #c2410c;
+    }
+    .btn-green {
+      background: linear-gradient(to bottom, #4ade80, #22c55e);
+      box-shadow: 0 5px 0 #15803d;
+    }
+    .btn-gray {
+      background: linear-gradient(to bottom, #94a3b8, #64748b);
+      box-shadow: 0 5px 0 #475569;
+    }
+
+    /* 하늘에서 떨어지는 문제 말풍선 */
+    .drop-bubble {
+      position: absolute;
+      transform: translateX(-50%);
+      animation: floatWobble 1.8s ease-in-out infinite alternate;
+      box-shadow: 0 6px 14px rgba(37, 99, 235, 0.22);
+    }
+    @keyframes floatWobble {
+      0% { margin-left: -4px; }
+      100% { margin-left: 4px; }
+    }
+
+    /* 정답 팝 애니메이션 */
+    @keyframes popOut {
+      0% { transform: translate(-50%, 0) scale(1); opacity: 1; }
+      50% { transform: translate(-50%, -18px) scale(1.35); opacity: 0.95; }
+      100% { transform: translate(-50%, -35px) scale(0.5); opacity: 0; }
+    }
+    .animate-pop {
+      animation: popOut 0.35s ease-out forwards;
+    }
+
+    /* 오답 및 입력 오류 흔들림 애니메이션 */
+    @keyframes shakeBox {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-7px); }
+      40%, 80% { transform: translateX(7px); }
+    }
+    .animate-shake {
+      animation: shakeBox 0.32s ease-in-out;
+    }
+
+    /* 캐릭터 아바타 장식품 착용 위치 (최대 5개 슬롯) */
+    .equip-slot-0 { top: -22px; left: 50%; transform: translateX(-50%); font-size: 2.3rem; } /* 머리 위(모자) */
+    .equip-slot-1 { top: 12%; right: -18px; font-size: 1.85rem; transform: rotate(15deg); }   /* 오른쪽 위 */
+    .equip-slot-2 { top: 12%; left: -18px; font-size: 1.85rem; transform: rotate(-15deg); }   /* 왼쪽 위 */
+    .equip-slot-3 { bottom: 4%; right: -16px; font-size: 1.85rem; }                          /* 오른쪽 아래 */
+    .equip-slot-4 { bottom: 4%; left: -16px; font-size: 1.85rem; }                           /* 왼쪽 아래 */
+
+    /* 스크롤바 스타일 */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb { background: #93c5fd; border-radius: 10px; }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-2 sm:p-4">
+
+  <!-- 메인 앱 컨테이너 -->
+  <div id="app-container" class="w-full max-w-md bg-white rounded-3xl shadow-2xl border-4 border-sky-400 overflow-hidden flex flex-col h-[93vh] max-h-[800px] relative">
+
+    <!-- 상단 헤더 -->
+    <header class="bg-gradient-to-r from-sky-500 via-blue-500 to-indigo-500 text-white px-4 py-3 flex justify-between items-center shadow-md z-10">
+      <div class="flex items-center gap-2">
+        <span class="text-2xl drop-shadow">🧮</span>
+        <div>
+          <h1 class="font-game text-xl sm:text-2xl leading-none tracking-wide drop-shadow">무한 수학 도전</h1>
+          <span class="text-[11px] font-bold text-sky-100 tracking-wider">✨ 기획자: 박서원</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="sound-toggle" onclick="toggleSound()" class="bg-white/20 hover:bg-white/30 rounded-full w-8 h-8 flex items-center justify-center text-sm transition" title="효과음 켜기/끄기">🔊</button>
+        <div class="bg-amber-300 text-amber-950 font-game px-3 py-1 rounded-full flex items-center gap-1 shadow-inner border-2 border-amber-100 text-sm sm:text-base">
+          <span>🪙</span>
+          <span id="header-coins">0</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 1. 시작 및 캐릭터 이름 등록 화면 -->
+    <section id="screen-start" class="flex-1 flex flex-col items-center justify-between p-5 text-center overflow-y-auto bg-gradient-to-b from-sky-50/60 to-white">
+      <div class="mt-1">
+        <span class="inline-flex items-center gap-1.5 bg-amber-100 border-2 border-amber-300 text-amber-900 font-game text-sm px-4 py-1 rounded-full shadow-xs">
+          🏅 기획: <strong class="text-blue-700">박서원</strong> 어린이
+        </span>
+      </div>
+
+      <div class="flex flex-col items-center w-full my-auto py-2">
+        <div class="relative w-32 h-32 bg-gradient-to-b from-sky-100 to-blue-200 rounded-full border-4 border-sky-400 flex items-center justify-center text-6xl shadow-lg mb-4">
+          🧑‍🎓
+          <span class="absolute -top-2 -right-2 text-3xl animate-bounce">👑</span>
+        </div>
+
+        <h2 class="font-game text-2xl sm:text-3xl text-sky-900 mb-1">나만의 캐릭터 만들기</h2>
+        <p class="text-gray-500 text-sm mb-4">게임에서 사용할 캐릭터 이름을 직접 정해 주세요!</p>
+
+        <div class="w-full max-w-xs space-y-2.5">
+          <input type="text" id="input-char-name" maxlength="10" placeholder="이름 입력 (예: 박서원, 수학천재)"
+                 onkeyup="if(event.key==='Enter') handleCreateCharacter()"
+                 class="w-full px-4 py-3 text-center font-game text-lg border-3 border-sky-300 rounded-2xl focus:outline-none focus:border-blue-500 bg-white shadow-inner">
+
+          <!-- 중복 이름 안내 메시지 영역 -->
+          <div id="name-feedback" class="min-h-[22px] text-xs sm:text-sm font-bold text-rose-500 flex items-center justify-center"></div>
+
+          <button onclick="handleCreateCharacter()" class="w-full btn-game btn-blue text-white font-game text-xl py-3.5 rounded-2xl">
+            🚀 게임 시작하기
+          </button>
+        </div>
+
+        <!-- 기존 저장된 캐릭터 목록 (이어하기) -->
+        <div id="saved-profiles-box" class="w-full mt-5 pt-4 border-t-2 border-dashed border-sky-200 hidden">
+          <p class="text-xs font-bold text-sky-700 mb-2">👇 기존 캐릭터 선택해서 이어하기</p>
+          <div id="saved-profiles-list" class="flex flex-wrap justify-center gap-2 max-h-24 overflow-y-auto p-1"></div>
+        </div>
+      </div>
+
+      <!-- 하단 기획자 크레딧 푸터 -->
+      <footer class="w-full pt-2 text-center text-xs text-gray-400 font-bold">
+        게임 아이디어 &amp; 규칙 기획: <span class="text-sky-600">박서원</span>
+      </footer>
+    </section>
+
+    <!-- 2. 메인 로비 화면 -->
+    <section id="screen-lobby" class="hidden flex-1 flex flex-col items-center justify-between p-5 overflow-y-auto bg-gradient-to-b from-white to-sky-50">
+      <!-- 상단 기획자 배지 -->
+      <div class="w-full flex justify-between items-center text-xs">
+        <span class="bg-sky-100 text-sky-800 font-bold px-3 py-1 rounded-full border border-sky-200">
+          ✨ 기획: 박서원
+        </span>
+        <span class="text-gray-500 font-bold">
+          보유 장식품: <span id="lobby-owned-count" class="text-blue-600">0</span>/200개
+        </span>
+      </div>
+
+      <!-- 캐릭터 아바타 및 장착 아이템 실시간 미리보기 -->
+      <div class="flex flex-col items-center my-1">
+        <div class="relative w-36 h-36 bg-gradient-to-b from-amber-100 to-amber-200 rounded-full border-4 border-amber-400 flex items-center justify-center text-7xl shadow-xl mb-3">
+          🧑‍🎓
+          <div id="lobby-avatar-items" class="absolute inset-0 pointer-events-none"></div>
+        </div>
+        <div class="bg-blue-600 text-white font-game px-5 py-1 rounded-full text-lg shadow">
+          <span id="lobby-char-name">모험가</span>
+        </div>
+        <p class="text-xs font-bold text-gray-600 mt-1.5">
+          장식품 착용: <span id="lobby-equip-count" class="text-orange-500">0</span> / 5개
+        </p>
+      </div>
+
+      <!-- 현재 단계 도전 정보 카드 -->
+      <div class="w-full bg-white rounded-2xl p-4 border-2 border-sky-200 shadow-sm text-center">
+        <div class="inline-block bg-indigo-100 text-indigo-700 font-bold text-xs px-3 py-0.5 rounded-full mb-1">
+          총 10단계 산성비 연산 도전
+        </div>
+        <h3 class="font-game text-2xl text-gray-800">
+          현재 도전: <span id="lobby-level" class="text-blue-600 text-3xl">1</span>단계 / 10단계
+        </h3>
+        <p class="text-xs text-gray-500 mt-1">
+          10문제 중 <span class="text-rose-500 font-bold">3문제 이상 틀리면 실패!</span> 통과 시 <span class="text-amber-600 font-bold">🪙 100코인</span> 획득
+        </p>
+
+        <!-- 단계 진행 바 -->
+        <div class="w-full bg-gray-200 h-3 rounded-full mt-3 overflow-hidden p-0.5">
+          <div id="lobby-level-bar" class="bg-gradient-to-r from-emerald-400 to-green-500 h-full rounded-full transition-all duration-500" style="width: 10%;"></div>
+        </div>
+      </div>
+
+      <!-- 메인 액션 버튼 -->
+      <div class="w-full space-y-2.5 mt-2">
+        <button onclick="startGame()" class="w-full btn-game btn-green text-white font-game text-2xl py-3.5 rounded-2xl flex items-center justify-center gap-2">
+          <span>🎮</span> <span id="start-btn-text">1단계 도전 시작!</span>
+        </button>
+
+        <div class="grid grid-cols-2 gap-2.5">
+          <button onclick="openShop()" class="btn-game btn-orange text-white font-game text-lg py-3 rounded-2xl flex items-center justify-center gap-1.5">
+            <span>🛍️</span> 상점 &amp; 꾸미기
+          </button>
+          <button onclick="switchCharacter()" class="btn-game btn-gray text-white font-game text-lg py-3 rounded-2xl flex items-center justify-center gap-1.5">
+            <span>🔄</span> 다른 이름 선택
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. 산성비 수학 게임 플레이 화면 -->
+    <section id="screen-game" class="hidden flex-1 flex flex-col relative overflow-hidden">
+      <!-- 상단 HUD -->
+      <div class="bg-sky-100 px-3 py-2 flex justify-between items-center border-b-2 border-sky-200 text-xs sm:text-sm font-bold z-10">
+        <div class="bg-white px-2.5 py-1 rounded-xl text-blue-700 shadow-xs">
+          🚩 <span id="hud-level">1</span>/10단계
+        </div>
+        <div class="bg-white px-2.5 py-1 rounded-xl text-emerald-700 shadow-xs">
+          📝 진행: <span id="hud-progress">0</span>/10문제
+        </div>
+        <div class="bg-white px-2.5 py-1 rounded-xl text-rose-600 shadow-xs flex items-center gap-1">
+          <span>틀림(<span id="hud-wrong-num">0</span>/3):</span>
+          <span id="hud-hearts">❤️❤️❤️</span>
+        </div>
+      </div>
+
+      <!-- 하늘 영역 (2문제씩 떨어지는 공간) -->
+      <div id="game-sky" class="flex-1 relative bg-gradient-to-b from-sky-200 via-sky-100 to-amber-50 overflow-hidden">
+        <div class="absolute top-6 left-6 text-4xl opacity-40 pointer-events-none">☁️</div>
+        <div class="absolute top-16 right-8 text-5xl opacity-30 pointer-events-none">☁️</div>
+
+        <!-- 플레이어 미니 아바타 -->
+        <div class="absolute bottom-2 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none opacity-95">
+          <div class="relative w-14 h-14 bg-amber-100 rounded-full border-2 border-amber-400 flex items-center justify-center text-3xl shadow">
+            🧑‍🎓
+            <div id="game-avatar-items" class="absolute inset-0 scale-50"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 위험 바닥 라인 -->
+      <div class="h-2.5 bg-gradient-to-r from-rose-400 via-red-500 to-rose-400 w-full shadow-inner"></div>
+
+      <!-- 하단 정답 입력창 -->
+      <div id="game-input-bar" class="bg-white p-3 border-t-2 border-sky-200 flex gap-2 items-center z-10">
+        <button onclick="abortGame()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-game px-3 py-3 rounded-xl text-sm">
+          나가기
+        </button>
+        <input type="number" id="game-answer-input" inputmode="numeric" placeholder="정답 입력 후 엔터!"
+               onkeyup="if(event.key==='Enter') submitAnswer()"
+               class="flex-1 px-3 py-2.5 text-center font-game text-2xl border-3 border-blue-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300 bg-blue-50/40">
+        <button onclick="submitAnswer()" class="btn-game btn-blue text-white font-game text-xl px-5 py-3 rounded-xl">
+          입력
+        </button>
+      </div>
+    </section>
+
+    <!-- 4. 상점 및 캐릭터 꾸미기 화면 (총 200개 아이템) -->
+    <section id="screen-shop" class="hidden flex-1 flex flex-col p-4 bg-amber-50/70 overflow-hidden">
+      <div class="flex justify-between items-center mb-2">
+        <div>
+          <h2 class="font-game text-xl text-amber-950">🛍️ 상점 &amp; 꾸미기 (200개)</h2>
+          <p class="text-xs text-gray-600">장식품 하나마다 <span class="font-bold text-amber-600">10코인</span>! 클릭해서 구매/착용 (최대 5개)</p>
+        </div>
+        <button onclick="closeShop()" class="btn-game btn-blue text-white font-game px-3.5 py-2 rounded-xl text-sm">
+          돌아가기
+        </button>
+      </div>
+
+      <!-- 상단 캐릭터 착용 미리보기 바 -->
+      <div class="bg-white rounded-2xl p-2.5 mb-2.5 border-2 border-amber-200 flex items-center justify-between shadow-xs">
+        <div class="flex items-center gap-3">
+          <div class="relative w-14 h-14 bg-amber-100 rounded-full border-2 border-amber-400 flex items-center justify-center text-3xl ml-2">
+            🧑‍🎓
+            <div id="shop-avatar-items" class="absolute inset-0 scale-[0.45]"></div>
+          </div>
+          <div>
+            <div class="font-game text-base text-gray-800" id="shop-char-name">캐릭터</div>
+            <div class="text-xs font-bold text-orange-600">착용 중: <span id="shop-equip-count">0</span> / 5개</div>
+          </div>
+        </div>
+        <button onclick="unequipAll()" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold px-2.5 py-1.5 rounded-lg border border-gray-300">
+          모두 해제
+        </button>
+      </div>
+
+      <!-- 카테고리 탭 (전체 200 / 모자 100 / 학용품 100 / 보유함) -->
+      <div class="grid grid-cols-4 gap-1.5 mb-2.5">
+        <button onclick="setShopFilter('all')" id="tab-all" class="shop-tab font-game py-2 rounded-xl text-xs sm:text-sm bg-amber-500 text-white shadow">
+          전체(200)
+        </button>
+        <button onclick="setShopFilter('hat')" id="tab-hat" class="shop-tab font-game py-2 rounded-xl text-xs sm:text-sm bg-white text-gray-600 border border-amber-200">
+          🎩모자(100)
+        </button>
+        <button onclick="setShopFilter('school')" id="tab-school" class="shop-tab font-game py-2 rounded-xl text-xs sm:text-sm bg-white text-gray-600 border border-amber-200">
+          ✏️학용품(100)
+        </button>
+        <button onclick="setShopFilter('owned')" id="tab-owned" class="shop-tab font-game py-2 rounded-xl text-xs sm:text-sm bg-white text-gray-600 border border-amber-200">
+          🎒보유함
+        </button>
+      </div>
+
+      <!-- 200개 아이템 그리드 -->
+      <div id="shop-items-grid" class="flex-1 grid grid-cols-4 gap-2 overflow-y-auto p-1 content-start"></div>
+    </section>
+
+    <!-- 커스텀 알림 모달 (alert 대체) -->
+    <div id="custom-modal" class="hidden absolute inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-5 z-50">
+      <div class="bg-white rounded-3xl p-6 max-w-xs w-full text-center border-4 border-sky-400 shadow-2xl">
+        <div id="modal-emoji" class="text-5xl mb-3">🎉</div>
+        <h3 id="modal-title" class="font-game text-2xl text-gray-800 mb-2">알림</h3>
+        <p id="modal-desc" class="text-sm text-gray-600 mb-5 leading-relaxed whitespace-pre-line">내용</p>
+        <button onclick="closeModal()" class="w-full btn-game btn-blue text-white font-game text-lg py-3 rounded-2xl">
+          확인!
+        </button>
+      </div>
+    </div>
+
+    <!-- 토스트 알림 -->
+    <div id="toast-msg" class="hidden absolute bottom-20 left-1/2 -translate-x-1/2 bg-gray-900/90 text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg z-40 whitespace-nowrap"></div>
+  </div>
+
+<script>
+  /**
+   * 1. Web Audio API 효과음 생성기
+   */
+  let soundEnabled = true;
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  function toggleSound() {
+    soundEnabled = !soundEnabled;
+    document.getElementById('sound-toggle').textContent = soundEnabled ? '🔊' : '🔇';
+  }
+
+  function playTone(type) {
+    if (!soundEnabled) return;
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    const now = audioCtx.currentTime;
+    if (type === 'correct') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(523.25, now);
+      osc.frequency.setValueAtTime(659.25, now + 0.08);
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+      osc.start(now);
+      osc.stop(now + 0.25);
+    } else if (type === 'wrong') {
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(175, now);
+      osc.frequency.linearRampToValueAtTime(110, now + 0.25);
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.28);
+      osc.start(now);
+      osc.stop(now + 0.28);
+    } else if (type === 'typo') {
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(240, now);
+      osc.frequency.setValueAtTime(200, now + 0.06);
+      gain.gain.setValueAtTime(0.1, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.14);
+      osc.start(now);
+      osc.stop(now + 0.14);
+    } else if (type === 'clear') {
+      osc.type = 'triangle';
+      [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+        osc.frequency.setValueAtTime(freq, now + idx * 0.1);
+      });
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.55);
+      osc.start(now);
+      osc.stop(now + 0.55);
+    } else if (type === 'coin') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, now);
+      osc.frequency.setValueAtTime(1174.66, now + 0.06);
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+      osc.start(now);
+      osc.stop(now + 0.2);
+    }
+  }
+
+  /**
+   * 2. 상점 장식품 200개 생성 (모자 100개 + 학용품 100개, 개당 10코인)
+   */
+  const SHOP_ITEMS = [];
+  (function generateShopItems() {
+    const hatBase = [
+      { icon: '🎓', name: '학사모' }, { icon: '🧢', name: '야구모자' }, { icon: '👒', name: '밀짚모자' },
+      { icon: '🎩', name: '마술모자' }, { icon: '👑', name: '왕관' }, { icon: '⛑️', name: '안전모' },
+      { icon: '🎀', name: '리본핀' }, { icon: '🎧', name: '헤드셋' }, { icon: '🐰', name: '토끼귀' },
+      { icon: '🐱', name: '고양이귀' }, { icon: '🐶', name: '강아지귀' }, { icon: '🦊', name: '여우귀' },
+      { icon: '🐻', name: '곰돌이귀' }, { icon: '🐼', name: '판다모자' }, { icon: '🦁', name: '사자갈기' },
+      { icon: '🐸', name: '개구리모자' }, { icon: '🦄', name: '유니콘뿔' }, { icon: '🌟', name: '별머리띠' },
+      { icon: '🌸', name: '꽃화관' }, { icon: '🤠', name: '카우보이' }
+    ];
+    const hatPrefixes = ['빨강', '파랑', '노랑', '초록', '보라'];
+
+    let itemId = 1;
+    // 모자 100개
+    hatPrefixes.forEach((prefix) => {
+      hatBase.forEach((item) => {
+        SHOP_ITEMS.push({
+          id: itemId++,
+          category: 'hat',
+          name: `${prefix} ${item.name}`,
+          icon: item.icon,
+          price: 10
+        });
+      });
+    });
+
+    const schoolBase = [
+      { icon: '✏️', name: '연필' }, { icon: '🖊️', name: '만년필' }, { icon: '🖍️', name: '크레파스' },
+      { icon: '🖌️', name: '미술붓' }, { icon: '📏', name: '눈금자' }, { icon: '📐', name: '삼각자' },
+      { icon: '✂️', name: '가위' }, { icon: '📌', name: '압정핀' }, { icon: '📎', name: '클립' },
+      { icon: '📒', name: '노란공책' }, { icon: '📕', name: '빨간책' }, { icon: '📗', name: '초록책' },
+      { icon: '📘', name: '파란책' }, { icon: '📚', name: '백과사전' }, { icon: '🎒', name: '책가방' },
+      { icon: '🔍', name: '돋보기' }, { icon: '🔬', name: '현미경' }, { icon: '🔭', name: '망원경' },
+      { icon: '🎨', name: '팔레트' }, { icon: '🧮', name: '주판' }
+    ];
+    const schoolPrefixes = ['기본', '튼튼', '반짝', '황금', '전설'];
+
+    // 학용품 100개
+    schoolPrefixes.forEach((prefix) => {
+      schoolBase.forEach((item) => {
+        SHOP_ITEMS.push({
+          id: itemId++,
+          category: 'school',
+          name: `${prefix} ${item.name}`,
+          icon: item.icon,
+          price: 10
+        });
+      });
+    });
+  })();
+
+  /**
+   * 3. 상태 관리 및 로컬 스토리지
+   */
+  const STORAGE_KEY = 'infinite_math_seowon_users_v1';
+  let allUsers = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+  let currentUser = null;
+
+  function saveToStorage() {
+    if (currentUser) {
+      allUsers[currentUser.name] = currentUser;
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(allUsers));
+  }
+
+  function switchScreen(screenId) {
+    ['screen-start', 'screen-lobby', 'screen-game', 'screen-shop'].forEach(id => {
+      document.getElementById(id).classList.add('hidden');
+    });
+    document.getElementById(screenId).classList.remove('hidden');
+  }
+
+  let modalCallback = null;
+  function showModal(emoji, title, desc, callback = null) {
+    document.getElementById('modal-emoji').textContent = emoji;
+    document.getElementById('modal-title').textContent = title;
+    document.getElementById('modal-desc').textContent = desc;
+    modalCallback = callback;
+    document.getElementById('custom-modal').classList.remove('hidden');
+  }
+
+  function closeModal() {
+    document.getElementById('custom-modal').classList.add('hidden');
+    if (modalCallback) {
+      const cb = modalCallback;
+      modalCallback = null;
+      cb();
+    }
+  }
+
+  let toastTimer = null;
+  function showToast(msg) {
+    const el = document.getElementById('toast-msg');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.add('hidden'), 1800);
+  }
+
+  /**
+   * 4. 캐릭터 이름 생성 및 중복 체크
+   */
+  function renderSavedProfiles() {
+    const names = Object.keys(allUsers);
+    const box = document.getElementById('saved-profiles-box');
+    const list = document.getElementById('saved-profiles-list');
+
+    if (names.length === 0) {
+      box.classList.add('hidden');
+      return;
+    }
+
+    box.classList.remove('hidden');
+    list.innerHTML = names.map(name => {
+      const u = allUsers[name];
+      const displayLvl = u.level > 10 ? '완주🏆' : `${u.level}단계`;
+      return `
+        <button onclick="selectCharacter('${name}')"
+                class="bg-sky-100 hover:bg-sky-200 text-sky-900 border border-sky-300 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition">
+          <span>🧑‍🎓 ${name}</span>
+          <span class="bg-white px-1.5 py-0.5 rounded text-[10px] text-blue-600">${displayLvl}</span>
+        </button>
+      `;
+    }).join('');
+  }
+
+  function handleCreateCharacter() {
+    const input = document.getElementById('input-char-name');
+    const feedback = document.getElementById('name-feedback');
+    const name = input.value.trim();
+
+    if (!name) {
+      feedback.textContent = '⚠️ 캐릭터 이름을 입력해 주세요!';
+      input.focus();
+      return;
+    }
+
+    // 중복 이름 체크
+    if (allUsers[name]) {
+      feedback.textContent = '❌ 이미 똑같은 이름이 있어요! 다른 이름을 선택해주세요.';
+      playTone('wrong');
+      input.select();
+      return;
+    }
+
+    currentUser = {
+      name: name,
+      level: 1,
+      coins: 0,
+      owned: [],
+      equipped: []
+    };
+    saveToStorage();
+    feedback.textContent = '';
+    input.value = '';
+    playTone('coin');
+    enterLobby();
+  }
+
+  function selectCharacter(name) {
+    if (!allUsers[name]) return;
+    currentUser = allUsers[name];
+    playTone('coin');
+    enterLobby();
+  }
+
+  function switchCharacter() {
+    currentUser = null;
+    document.getElementById('header-coins').textContent = '0';
+    renderSavedProfiles();
+    switchScreen('screen-start');
+  }
+
+  /**
+   * 5. 로비 화면 및 아바타 렌더링
+   */
+  function renderAvatarEquipments(containerId) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = '';
+    if (!currentUser) return;
+
+    currentUser.equipped.forEach((itemId, slotIndex) => {
+      const item = SHOP_ITEMS.find(i => i.id === itemId);
+      if (item && slotIndex < 5) {
+        const span = document.createElement('span');
+        span.className = `absolute equip-slot-${slotIndex} drop-shadow`;
+        span.textContent = item.icon;
+        container.appendChild(span);
+      }
+    });
+  }
+
+  function enterLobby() {
+    document.getElementById('header-coins').textContent = currentUser.coins;
+    document.getElementById('lobby-char-name').textContent = currentUser.name;
+    document.getElementById('lobby-equip-count').textContent = currentUser.equipped.length;
+    document.getElementById('lobby-owned-count').textContent = currentUser.owned.length;
+
+    const effectiveLevel = Math.min(currentUser.level, 10);
+    document.getElementById('lobby-level').textContent = effectiveLevel;
+    document.getElementById('lobby-level-bar').style.width = `${effectiveLevel * 10}%`;
+
+    const startBtnText = document.getElementById('start-btn-text');
+    if (currentUser.level > 10) {
+      startBtnText.textContent = '10단계 무한 연습하기!';
+    } else {
+      startBtnText.textContent = `${currentUser.level}단계 도전 시작!`;
+    }
+
+    renderAvatarEquipments('lobby-avatar-items');
+    switchScreen('screen-lobby');
+  }
+
+  /**
+   * 6. 산성비 수학 게임 로직 (2문제씩 낙하, 10문제 중 3문제 이상 틀리면 실패)
+   */
+  let gameLoopId = null;
+  let activeDrops = [];
+  let spawnedCount = 0;
+  let completedCount = 0;
+  let wrongCount = 0;
+  let isGameRunning = false;
+  const QUESTIONS_PER_STAGE = 10;
+
+  function startGame() {
+    const playLevel = Math.min(currentUser.level, 10);
+
+    activeDrops = [];
+    spawnedCount = 0;
+    completedCount = 0;
+    wrongCount = 0;
+    isGameRunning = true;
+
+    document.getElementById('hud-level').textContent = playLevel;
+    updateGameHud();
+    renderAvatarEquipments('game-avatar-items');
+
+    const sky = document.getElementById('game-sky');
+    sky.querySelectorAll('.drop-bubble').forEach(el => el.remove());
+
+    switchScreen('screen-game');
+
+    const ansInput = document.getElementById('game-answer-input');
+    ansInput.value = '';
+    setTimeout(() => ansInput.focus(), 100);
+
+    // 처음 2문제 낙하 시작
+    spawnTwoProblems(playLevel);
+
+    let lastTime = performance.now();
+    function loop(now) {
+      if (!isGameRunning) return;
+      const dt = (now - lastTime) / 1000;
+      lastTime = now;
+
+      updateDrops(dt, playLevel);
+      gameLoopId = requestAnimationFrame(loop);
+    }
+    gameLoopId = requestAnimationFrame(loop);
+  }
+
+  function spawnTwoProblems(level) {
+    const sky = document.getElementById('game-sky');
+    const maxNum = level * 10;
+
+    for (let i = 0; i < 2; i++) {
+      if (spawnedCount >= QUESTIONS_PER_STAGE) break;
+      spawnedCount++;
+
+      const isAddition = Math.random() < 0.5;
+      let a = Math.floor(Math.random() * maxNum) + 1;
+      let b = Math.floor(Math.random() * maxNum) + 1;
+
+      if (!isAddition && a < b) {
+        [a, b] = [b, a];
+      }
+
+      const expression = isAddition ? `${a} + ${b}` : `${a} - ${b}`;
+      const answer = isAddition ? (a + b) : (a - b);
+
+      const el = document.createElement('div');
+      el.className = 'drop-bubble bg-white border-3 border-blue-500 text-blue-950 font-game text-xl sm:text-2xl px-4 py-2 rounded-2xl';
+      el.textContent = expression;
+
+      // 왼쪽(25% 부근)과 오른쪽(75% 부근)으로 분리 배치해 겹치지 않게 함
+      const xPercent = i === 0 ? (22 + Math.random() * 10) : (68 + Math.random() * 10);
+      const startY = i === 0 ? -45 : -95;
+
+      el.style.left = `${xPercent}%`;
+      el.style.top = `${startY}px`;
+      sky.appendChild(el);
+
+      activeDrops.push({
+        el: el,
+        answer: answer,
+        y: startY
+      });
+    }
+  }
+
+  function updateDrops(dt, level) {
+    const sky = document.getElementById('game-sky');
+    const floorY = sky.clientHeight - 48;
+
+    // 현재 화면의 2문제가 모두 사라졌고 10문제가 다 안 나왔다면 다음 2문제 생성
+    if (activeDrops.length === 0 && spawnedCount < QUESTIONS_PER_STAGE) {
+      spawnTwoProblems(level);
+    }
+
+    const speedPerSec = 40 + (level * 8);
+
+    for (let i = activeDrops.length - 1; i >= 0; i--) {
+      const drop = activeDrops[i];
+      drop.y += speedPerSec * dt;
+      drop.el.style.top = `${drop.y}px`;
+
+      // 빨간 바닥선에 닿았을 때 오답 처리
+      if (drop.y >= floorY) {
+        drop.el.remove();
+        activeDrops.splice(i, 1);
+        handleMistake();
+        if (!isGameRunning) return;
+      }
+    }
+  }
+
+  function submitAnswer() {
+    if (!isGameRunning) return;
+    const input = document.getElementById('game-answer-input');
+    const val = parseInt(input.value, 10);
+    input.value = '';
+    input.focus();
+
+    if (isNaN(val)) return;
+
+    // 더 아래에 내려온 문제부터 우선 정답 비교
+    activeDrops.sort((a, b) => b.y - a.y);
+    const hitIndex = activeDrops.findIndex(d => d.answer === val);
+
+    if (hitIndex !== -1) {
+      const target = activeDrops[hitIndex];
+      activeDrops.splice(hitIndex, 1);
+
+      target.el.classList.remove('drop-bubble');
+      target.el.classList.add('animate-pop', 'bg-emerald-400', 'text-white', 'border-emerald-600');
+      target.el.textContent = '정답! ✨';
+      setTimeout(() => target.el.remove(), 350);
+
+      playTone('correct');
+      completedCount++;
+      updateGameHud();
+      checkStageResult();
+    } else {
+      // 오타나 다른 숫자를 입력했을 때는 즉시 실격시키지 않고 입력창 흔들림 피드백 제공
+      playTone('typo');
+      const inputBar = document.getElementById('game-input-bar');
+      inputBar.classList.remove('animate-shake');
+      void inputBar.offsetWidth;
+      inputBar.classList.add('animate-shake');
+    }
+  }
+
+  function handleMistake() {
+    wrongCount++;
+    completedCount++;
+    playTone('wrong');
+
+    const container = document.getElementById('app-container');
+    container.classList.remove('animate-shake');
+    void container.offsetWidth;
+    container.classList.add('animate-shake');
+
+    updateGameHud();
+    checkStageResult();
+  }
+
+  function updateGameHud() {
+    document.getElementById('hud-progress').textContent = completedCount;
+    document.getElementById('hud-wrong-num').textContent = wrongCount;
+
+    const livesLeft = Math.max(0, 3 - wrongCount);
+    document.getElementById('hud-hearts').textContent = '❤️'.repeat(livesLeft) + '🖤'.repeat(3 - livesLeft);
+  }
+
+  function checkStageResult() {
+    // 10문제 중 3문제 이상 틀리면 다음 단계로 못 넘어감
+    if (wrongCount >= 3) {
+      stopGameLoop();
+      showModal(
+        '😢',
+        '아쉬워요! 단계 실패',
+        '10문제 중 3문제를 틀려서\n다음 단계로 넘어가지 못했어요.\n다시 한 번 도전해 볼까요?',
+        () => enterLobby()
+      );
+      return;
+    }
+
+    // 10문제를 완료했고 오답이 2문제 이하라면 통과 + 100코인 지급
+    if (completedCount >= QUESTIONS_PER_STAGE) {
+      stopGameLoop();
+      playTone('clear');
+      currentUser.coins += 100;
+
+      if (currentUser.level < 10) {
+        const clearedLvl = currentUser.level;
+        currentUser.level++;
+        saveToStorage();
+        showModal(
+          '🎉',
+          `${clearedLvl}단계 통과 성공!`,
+          `보상으로 🪙 100코인을 받았어요!\n이제 ${currentUser.level}단계로 넘어갑니다!`,
+          () => enterLobby()
+        );
+      } else {
+        currentUser.level = 11;
+        saveToStorage();
+        showModal(
+          '🏆',
+          '전설의 수학왕 탄생!',
+          '마지막 10단계까지 모두 통과했어요!\n보상 🪙 100코인을 받았습니다!',
+          () => enterLobby()
+        );
+      }
+    }
+  }
+
+  function stopGameLoop() {
+    isGameRunning = false;
+    if (gameLoopId) {
+      cancelAnimationFrame(gameLoopId);
+      gameLoopId = null;
+    }
+  }
+
+  function abortGame() {
+    stopGameLoop();
+    enterLobby();
+  }
+
+  /**
+   * 7. 상점 및 캐릭터 꾸미기 (총 200개 아이템, 개당 10코인, 최대 5개 착용)
+   */
+  let currentShopFilter = 'all';
+
+  function openShop() {
+    currentShopFilter = 'all';
+    updateShopTabs();
+    renderShopUI();
+    switchScreen('screen-shop');
+  }
+
+  function closeShop() {
+    enterLobby();
+  }
+
+  function setShopFilter(filter) {
+    currentShopFilter = filter;
+    updateShopTabs();
+    renderShopGrid();
+  }
+
+  function updateShopTabs() {
+    ['all', 'hat', 'school', 'owned'].forEach(key => {
+      const btn = document.getElementById(`tab-${key}`);
+      if (key === currentShopFilter) {
+        btn.className = 'shop-tab font-game py-2 rounded-xl text-xs sm:text-sm bg-amber-500 text-white shadow';
+      } else {
+        btn.className = 'shop-tab font-game py-2 rounded-xl text-xs sm:text-sm bg-white text-gray-600 border border-amber-200';
+      }
+    });
+  }
+
+  function renderShopUI() {
+    document.getElementById('header-coins').textContent = currentUser.coins;
+    document.getElementById('shop-char-name').textContent = currentUser.name;
+    document.getElementById('shop-equip-count').textContent = currentUser.equipped.length;
+    renderAvatarEquipments('shop-avatar-items');
+    renderShopGrid();
+  }
+
+  function renderShopGrid() {
+    const grid = document.getElementById('shop-items-grid');
+    let items = SHOP_ITEMS;
+
+    if (currentShopFilter === 'hat') {
+      items = SHOP_ITEMS.filter(item => item.category === 'hat');
+    } else if (currentShopFilter === 'school') {
+      items = SHOP_ITEMS.filter(item => item.category === 'school');
+    } else if (currentShopFilter === 'owned') {
+      items = SHOP_ITEMS.filter(item => currentUser.owned.includes(item.id));
+    }
+
+    if (items.length === 0) {
+      grid.innerHTML = `<div class="col-span-4 text-center text-gray-400 text-sm py-12 font-bold">아직 구매한 장식품이 없어요!<br>게임을 클리어해서 코인을 모아보세요 🪙</div>`;
+      return;
+    }
+
+    grid.innerHTML = items.map(item => {
+      const isOwned = currentUser.owned.includes(item.id);
+      const isEquipped = currentUser.equipped.includes(item.id);
+
+      let cardStyle = 'bg-white border-gray-200';
+      let badge = `<span class="text-[11px] font-bold text-amber-600">🪙 10코인</span>`;
+
+      if (isEquipped) {
+        cardStyle = 'bg-orange-100 border-orange-500 ring-2 ring-orange-300';
+        badge = `<span class="text-[10px] font-bold bg-orange-500 text-white px-1.5 py-0.5 rounded-full">착용중</span>`;
+      } else if (isOwned) {
+        cardStyle = 'bg-sky-50 border-sky-300';
+        badge = `<span class="text-[10px] font-bold text-sky-600">보유함</span>`;
+      }
+
+      return `
+        <div onclick="handleShopItemClick(${item.id})"
+             class="border-2 ${cardStyle} rounded-2xl p-2 flex flex-col items-center justify-between cursor-pointer hover:scale-105 transition text-center shadow-2xs">
+          <div class="text-2xl sm:text-3xl my-0.5">${item.icon}</div>
+          <div class="text-[10px] font-bold text-gray-700 leading-tight line-clamp-1 w-full">${item.name}</div>
+          <div class="mt-1">${badge}</div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function handleShopItemClick(itemId) {
+    const item = SHOP_ITEMS.find(i => i.id === itemId);
+    if (!item) return;
+
+    const isOwned = currentUser.owned.includes(itemId);
+    const isEquipped = currentUser.equipped.includes(itemId);
+
+    if (!isOwned) {
+      if (currentUser.coins < item.price) {
+        playTone('wrong');
+        showToast('🪙 코인이 부족해요! 단계를 통과해 코인을 모으세요.');
+        return;
+      }
+
+      currentUser.coins -= item.price;
+      currentUser.owned.push(itemId);
+      playTone('coin');
+
+      if (currentUser.equipped.length < 5) {
+        currentUser.equipped.push(itemId);
+        showToast(`'${item.name}' 구매 및 착용 완료! ✨`);
+      } else {
+        showToast(`'${item.name}' 구매 완료! (착용은 5개까지 가능)`);
+      }
+    } else {
+      if (isEquipped) {
+        currentUser.equipped = currentUser.equipped.filter(id => id !== itemId);
+        showToast(`'${item.name}' 착용 해제`);
+      } else {
+        if (currentUser.equipped.length >= 5) {
+          playTone('wrong');
+          showToast('⚠️ 장식품 착용은 최대 5개까지만 가능해요!');
+          return;
+        }
+        currentUser.equipped.push(itemId);
+        playTone('coin');
+        showToast(`'${item.name}' 착용 완료! ✨`);
+      }
+    }
+
+    saveToStorage();
+    renderShopUI();
+  }
+
+  function unequipAll() {
+    if (currentUser.equipped.length === 0) return;
+    currentUser.equipped = [];
+    saveToStorage();
+    renderShopUI();
+    showToast('착용 중인 장식품을 모두 해제했습니다.');
+  }
+
+  window.onload = function() {
+    renderSavedProfiles();
+  };
+</script>
+</body>
+</html>

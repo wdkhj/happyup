@@ -1,0 +1,1923 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>컴투스프로야구 2027 - 기획: 김하람</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Jua&family=Noto+Sans+KR:wght@500;700;900&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      background-color: #0b132b;
+      color: #ffffff;
+      user-select: none;
+      -webkit-user-select: none;
+      overflow-x: hidden;
+    }
+    .font-game {
+      font-family: 'Black Han Sans', sans-serif;
+      letter-spacing: 0.03em;
+    }
+    .font-cute {
+      font-family: 'Jua', sans-serif;
+    }
+    /* 전광판 스타일 LED 폰트 느낌 */
+    .scoreboard-glow {
+      text-shadow: 0 0 8px rgba(250, 204, 21, 0.7);
+    }
+    /* 화면 흔들림 애니메이션 (홈런/강속구 타격감) */
+    @keyframes shake {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      20% { transform: translate(-6px, 4px) rotate(-1deg); }
+      40% { transform: translate(6px, -4px) rotate(1deg); }
+      60% { transform: translate(-4px, -3px) rotate(0deg); }
+      80% { transform: translate(4px, 3px) rotate(1deg); }
+    }
+    .animate-shake {
+      animation: shake 0.35s cubic-bezier(.36,.07,.19,.97) both;
+    }
+    /* 팝업 배너 애니메이션 */
+    @keyframes popIn {
+      0% { transform: scale(0.4) translateY(20px); opacity: 0; }
+      70% { transform: scale(1.1) translateY(-5px); opacity: 1; }
+      100% { transform: scale(1) translateY(0); opacity: 1; }
+    }
+    .animate-pop {
+      animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+    /* 3D 느낌의 입체 버튼 */
+    .btn-3d {
+      transition: all 0.1s ease;
+      box-shadow: 0 5px 0 rgba(0, 0, 0, 0.45);
+    }
+    .btn-3d:active:not(:disabled) {
+      transform: translateY(4px);
+      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
+    }
+    .btn-3d:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    /* 캔버스 반응형 유지 */
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: manipulation;
+    }
+    /* 커스텀 스크롤바 */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-gradient-to-b from-slate-900 via-blue-950 to-slate-950">
+
+  <!-- 상단 글로벌 헤더 (타이틀, 기획자 배지, 재화 표시) -->
+  <header class="w-full bg-slate-900/90 border-b border-blue-500/30 px-3 py-2.5 sm:px-6 flex flex-wrap items-center justify-between gap-2 sticky top-0 z-40 backdrop-blur-md">
+    <div class="flex items-center gap-2.5">
+      <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center shadow-lg border border-amber-200/50 text-xl sm:text-2xl">
+        ⚾
+      </div>
+      <div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <h1 class="font-game text-lg sm:text-2xl text-transparent bg-clip-text bg-gradient-to-r from-white via-amber-200 to-amber-400 tracking-tight">
+            컴투스프로야구 2027
+          </h1>
+          <span class="px-2 py-0.5 text-xs sm:text-sm font-cute bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-full shadow border border-emerald-300/40">
+            ✨ 기획: 김하람
+          </span>
+        </div>
+        <p class="text-[11px] sm:text-xs text-blue-300 hidden sm:block">초등학생 천재 게임 기획자 김하람의 꿈이 담긴 리얼 야구 액션!</p>
+      </div>
+    </div>
+
+    <!-- 보유 포인트 & 코인 & 사운드 토글 -->
+    <div class="flex items-center gap-2 sm:gap-3">
+      <div class="flex items-center gap-1.5 bg-slate-800/90 border border-blue-400/30 px-2.5 py-1 rounded-xl">
+        <span class="text-sm sm:text-base">🏆</span>
+        <div class="text-right">
+          <div class="text-[10px] text-blue-300 leading-none">포인트</div>
+          <div id="header-points" class="font-bold text-xs sm:text-sm text-blue-100">1,000 P</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-1.5 bg-slate-800/90 border border-amber-400/40 px-2.5 py-1 rounded-xl">
+        <span class="text-sm sm:text-base">🪙</span>
+        <div class="text-right">
+          <div class="text-[10px] text-amber-300 leading-none">코인</div>
+          <div id="header-coins" class="font-bold text-xs sm:text-sm text-amber-300">500 C</div>
+        </div>
+      </div>
+      <button id="btn-sound" onclick="toggleSound()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-sm sm:text-base" title="효과음 켜기/끄기">
+        🔊
+      </button>
+      <button id="btn-home-nav" onclick="goHome()" class="hidden px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs sm:text-sm font-bold shadow">
+        로비로
+      </button>
+    </div>
+  </header>
+
+  <!-- 메인 컨테이너 -->
+  <main class="flex-1 w-full max-w-6xl mx-auto p-3 sm:p-5 flex flex-col">
+
+    <!-- ==================== 1. 메인 로비 화면 ==================== -->
+    <section id="screen-lobby" class="flex-1 flex flex-col gap-4 sm:gap-5">
+      
+      <!-- 상단 배너 & 빠른 게임 시작 카드 -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <!-- 좌측: 구단 & 대표 선수 & 유니폼 설정 -->
+        <div class="lg:col-span-7 bg-slate-800/80 border border-blue-500/30 rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col gap-4">
+          <div class="flex items-center justify-between border-b border-slate-700 pb-2.5">
+            <h2 class="font-game text-lg sm:text-xl text-amber-300 flex items-center gap-2">
+              <span>🧢</span> 1. 구단 & 대표 선수 선택
+            </h2>
+            <span class="text-xs text-slate-400">내 팀과 에이스 선수를 고르세요!</span>
+          </div>
+
+          <!-- 내 팀 선택 -->
+          <div>
+            <label class="block text-xs font-bold text-blue-300 mb-2">내 응원 팀 선택</label>
+            <div id="my-team-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <!-- JS로 렌더링 -->
+            </div>
+          </div>
+
+          <!-- 상대 팀 선택 -->
+          <div>
+            <label class="block text-xs font-bold text-rose-300 mb-2">상대 라이벌 팀 선택</label>
+            <div id="opp-team-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <!-- JS로 렌더링 -->
+            </div>
+          </div>
+
+          <!-- 대표 선수 1명 고르기 -->
+          <div class="bg-slate-900/70 rounded-xl p-3 border border-indigo-500/30">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs sm:text-sm font-bold text-indigo-300">⭐ 대표 스타 선수 1명 영입 (특별 버프 적용!)</span>
+              <span id="selected-star-badge" class="text-[11px] px-2 py-0.5 rounded-full bg-indigo-600 text-white font-bold">선택됨</span>
+            </div>
+            <div id="star-player-grid" class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <!-- JS로 렌더링 -->
+            </div>
+          </div>
+        </div>
+
+        <!-- 우측: 게임 모드 선택 & 유니폼 락커룸 바로가기 -->
+        <div class="lg:col-span-5 flex flex-col gap-4">
+          <!-- 경기 모드 선택 카드 -->
+          <div class="bg-gradient-to-br from-blue-900/90 via-indigo-900/90 to-slate-900 border border-amber-400/40 rounded-2xl p-4 sm:p-5 shadow-xl flex-1 flex flex-col justify-between gap-3">
+            <div>
+              <h2 class="font-game text-lg sm:text-xl text-white flex items-center gap-2 mb-1">
+                <span>🏟️</span> 2. 게임 모드 선택
+              </h2>
+              <p class="text-xs text-blue-200 mb-3">원하는 포지션과 이닝을 골라 시합을 시작하세요!</p>
+
+              <!-- 플레이 포지션 & 이닝 설정 -->
+              <div class="grid grid-cols-2 gap-2 mb-3 bg-slate-950/50 p-2.5 rounded-xl border border-white/10">
+                <div>
+                  <span class="block text-[11px] text-slate-400 mb-1">플레이 역할</span>
+                  <select id="select-play-role" class="w-full bg-slate-800 text-white text-xs sm:text-sm font-bold rounded-lg px-2.5 py-2 border border-slate-600 focus:outline-none focus:border-amber-400">
+                    <option value="both">⚾ 공수 교대 (투수+타자)</option>
+                    <option value="batter">🏏 타자 집중 플레이</option>
+                    <option value="pitcher">🔥 투수 집중 플레이</option>
+                  </select>
+                </div>
+                <div>
+                  <span class="block text-[11px] text-slate-400 mb-1">경기 이닝</span>
+                  <select id="select-innings" class="w-full bg-slate-800 text-white text-xs sm:text-sm font-bold rounded-lg px-2.5 py-2 border border-slate-600 focus:outline-none focus:border-amber-400">
+                    <option value="1">⚡ 1이닝 스피드전</option>
+                    <option value="3" selected>🏆 3이닝 정규 경기</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex flex-col gap-2.5">
+              <button onclick="startRegularGame()" class="btn-3d w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 via-orange-500 to-red-500 hover:from-amber-300 hover:to-red-400 text-slate-950 font-game text-lg sm:text-xl flex items-center justify-center gap-2 shadow-lg">
+                <span>⚾</span> 정규 경기 시작하기!
+              </button>
+
+              <button onclick="startHomeRunDerby()" class="btn-3d w-full py-3 px-4 rounded-xl bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 hover:from-purple-500 hover:to-rose-500 text-white font-game text-base sm:text-lg flex items-center justify-center gap-2 shadow-lg border border-pink-300/30">
+                <span>🔥</span> 홈런왕 경쟁 모드 (아케이드)
+              </button>
+            </div>
+          </div>
+
+          <!-- 코인 유니폼 상점 미리보기 카드 -->
+          <div class="bg-slate-800/90 border border-amber-400/30 rounded-2xl p-4 shadow-xl">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="font-game text-base sm:text-lg text-amber-300 flex items-center gap-1.5">
+                <span>👕</span> 유니폼 락커룸 (코인으로 변경)
+              </h3>
+              <span id="current-uniform-name" class="text-xs font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-400/40">기본 홈 유니폼</span>
+            </div>
+            <div id="uniform-shop-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <!-- JS로 렌더링 -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 하단 기획서 체크리스트 배너 -->
+      <div class="bg-slate-900/70 border border-slate-700/80 rounded-2xl p-3 sm:p-4 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300">
+        <div class="flex items-center gap-2">
+          <span class="px-2 py-0.5 rounded bg-blue-600/30 text-blue-300 border border-blue-500/40 font-bold">김하람 기획서 구현 완료</span>
+          <span>투수/타자 선택 • 안타/2루타/3루타/홈런/뜬공/파울 • 도루/세이프 • 비디오 판독 • 타순/대타/투수교체 • 유니폼 상점 • 홈런왕 경쟁</span>
+        </div>
+        <div class="text-amber-300 font-bold">승리 보상: +300 코인 & +500 포인트!</div>
+      </div>
+    </section>
+
+    <!-- ==================== 2. 정규 경기 화면 ==================== -->
+    <section id="screen-game" class="hidden flex-1 flex flex-col gap-2.5">
+      
+      <!-- 전광판 스타일 스코어보드 -->
+      <div class="bg-slate-950 border-2 border-slate-700 rounded-2xl p-2.5 sm:p-3 shadow-2xl grid grid-cols-12 gap-2 items-center">
+        <!-- 팀 점수판 -->
+        <div class="col-span-6 sm:col-span-5 flex flex-col gap-1 bg-slate-900/90 p-2 rounded-xl border border-slate-800">
+          <div class="flex items-center justify-between text-xs sm:text-sm font-bold">
+            <div class="flex items-center gap-1.5">
+              <span id="sb-away-badge" class="w-3 h-3 rounded-full bg-rose-500 inline-block"></span>
+              <span id="sb-away-name" class="text-slate-200 truncate max-w-[90px] sm:max-w-[130px]">상대팀</span>
+            </div>
+            <span id="sb-away-score" class="font-game text-base sm:text-xl text-white scoreboard-glow">0</span>
+          </div>
+          <div class="flex items-center justify-between text-xs sm:text-sm font-bold">
+            <div class="flex items-center gap-1.5">
+              <span id="sb-home-badge" class="w-3 h-3 rounded-full bg-blue-500 inline-block"></span>
+              <span id="sb-home-name" class="text-amber-300 truncate max-w-[90px] sm:max-w-[130px]">내 팀</span>
+            </div>
+            <span id="sb-home-score" class="font-game text-base sm:text-xl text-amber-400 scoreboard-glow">0</span>
+          </div>
+        </div>
+
+        <!-- 이닝 & B/S/O 카운트 -->
+        <div class="col-span-6 sm:col-span-4 flex flex-col justify-center items-center bg-slate-900/90 p-2 rounded-xl border border-slate-800">
+          <div id="sb-inning" class="font-game text-sm sm:text-base text-emerald-400 mb-1">1회초 (수비)</div>
+          <div class="flex items-center gap-2.5 text-[11px] sm:text-xs font-bold">
+            <div class="flex items-center gap-1">
+              <span class="text-emerald-400">B</span>
+              <span id="dot-b1" class="w-2.5 h-2.5 rounded-full bg-slate-700"></span>
+              <span id="dot-b2" class="w-2.5 h-2.5 rounded-full bg-slate-700"></span>
+              <span id="dot-b3" class="w-2.5 h-2.5 rounded-full bg-slate-700"></span>
+            </div>
+            <div class="flex items-center gap-1">
+              <span class="text-amber-400">S</span>
+              <span id="dot-s1" class="w-2.5 h-2.5 rounded-full bg-slate-700"></span>
+              <span id="dot-s2" class="w-2.5 h-2.5 rounded-full bg-slate-700"></span>
+            </div>
+            <div class="flex items-center gap-1">
+              <span class="text-rose-500">O</span>
+              <span id="dot-o1" class="w-2.5 h-2.5 rounded-full bg-slate-700"></span>
+              <span id="dot-o2" class="w-2.5 h-2.5 rounded-full bg-slate-700"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 주자 다이아몬드 미니맵 & 작전 버튼 -->
+        <div class="col-span-12 sm:col-span-3 flex items-center justify-between sm:justify-end gap-3 bg-slate-900/90 px-3 py-1.5 rounded-xl border border-slate-800">
+          <!-- 다이아몬드 주자 표시 -->
+          <div class="relative w-11 h-11 flex items-center justify-center" title="주자 상황">
+            <!-- 2루 -->
+            <div id="base-2" class="w-3.5 h-3.5 rotate-45 border border-slate-400 bg-slate-800 absolute top-1 transition-colors"></div>
+            <!-- 3루 -->
+            <div id="base-3" class="w-3.5 h-3.5 rotate-45 border border-slate-400 bg-slate-800 absolute left-1 transition-colors"></div>
+            <!-- 1루 -->
+            <div id="base-1" class="w-3.5 h-3.5 rotate-45 border border-slate-400 bg-slate-800 absolute right-1 transition-colors"></div>
+            <!-- 홈 -->
+            <div class="w-2.5 h-2.5 rotate-45 bg-white/40 absolute bottom-1"></div>
+          </div>
+
+          <button onclick="openLineupModal()" class="btn-3d px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-bold flex items-center gap-1 shadow">
+            <span>📋</span> 타순/교체
+          </button>
+        </div>
+      </div>
+
+      <!-- 현재 출전 투수 & 타자 정보 바 -->
+      <div class="grid grid-cols-2 gap-2 text-xs">
+        <div class="bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-1.5 flex items-center justify-between">
+          <div>
+            <span class="text-[10px] text-rose-400 font-bold block">마운드 투수</span>
+            <span id="hud-pitcher-name" class="font-bold text-white text-xs sm:text-sm">강속구 에이스</span>
+          </div>
+          <div class="text-right">
+            <span class="text-[10px] text-slate-400 block">체력/구위</span>
+            <span id="hud-pitcher-stamina" class="font-bold text-emerald-400">100%</span>
+          </div>
+        </div>
+        <div class="bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-1.5 flex items-center justify-between">
+          <div>
+            <span class="text-[10px] text-amber-400 font-bold block">현재 타자</span>
+            <span id="hud-batter-name" class="font-bold text-white text-xs sm:text-sm">1번 김하람</span>
+          </div>
+          <div class="text-right">
+            <span class="text-[10px] text-slate-400 block">타율/파워</span>
+            <span id="hud-batter-stat" class="font-bold text-amber-300">.340 / A</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 야구장 그래픽 캔버스 영역 -->
+      <div id="canvas-container" class="relative w-full h-[310px] sm:h-[380px] rounded-2xl overflow-hidden border-2 border-emerald-500/40 shadow-2xl bg-sky-900">
+        <canvas id="stadium-canvas"></canvas>
+
+        <!-- 중앙 대형 판정 배너 (홈런, 안타, 삼진, 아웃, 세이프 등) -->
+        <div id="play-banner" class="hidden pointer-events-none absolute inset-0 flex flex-col items-center justify-center z-20 px-4 text-center">
+          <div id="play-banner-title" class="font-game text-4xl sm:text-6xl text-amber-300 drop-shadow-[0_5px_5px_rgba(0,0,0,0.9)] stroke-black">
+            홈런!!
+          </div>
+          <div id="play-banner-sub" class="mt-1 px-4 py-1 rounded-full bg-black/75 text-white font-bold text-xs sm:text-base border border-white/20">
+            비거리 125m 초대형 아치!
+          </div>
+        </div>
+
+        <!-- 비디오 판독 팝업 버튼 (아슬아슬한 판정 시 등장) -->
+        <div id="var-popup" class="hidden absolute bottom-3 left-1/2 -translate-x-1/2 z-30 bg-slate-900/95 border-2 border-amber-400 rounded-2xl p-3 shadow-2xl flex flex-col items-center gap-2 w-[90%] max-w-sm animate-pop">
+          <div class="flex items-center gap-1.5 text-amber-300 font-game text-base">
+            <span>📺</span> 아슬아슬한 접전! 비디오 판독?
+          </div>
+          <p id="var-desc" class="text-xs text-slate-200 text-center">1루에서 간발의 차로 아웃 판정! 판독을 요청할까요?</p>
+          <div class="flex gap-2 w-full">
+            <button onclick="requestVideoReview()" class="btn-3d flex-1 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs sm:text-sm">
+              판독 요청 (<span id="var-count-left">2</span>회 남음)
+            </button>
+            <button onclick="dismissVideoReview()" class="px-3 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-xs font-bold">
+              인정하기
+            </button>
+          </div>
+        </div>
+
+        <!-- 중계 텍스트 티커 (좌상단) -->
+        <div class="absolute top-2.5 left-2.5 bg-black/65 backdrop-blur-sm px-3 py-1 rounded-full border border-white/15 text-[11px] sm:text-xs text-amber-200 font-bold max-w-[85%] truncate">
+          🎙️ <span id="cast-commentary">플레이볼! 투수가 와인드업에 들어갑니다.</span>
+        </div>
+      </div>
+
+      <!-- 하단 조작 컨트롤 패널 (타자 모드 / 투수 모드 동적 전환) -->
+      <div class="bg-slate-800/95 border border-slate-700 rounded-2xl p-3 shadow-xl">
+        
+        <!-- A. 타자 공격 컨트롤 -->
+        <div id="controls-batting" class="flex flex-col sm:flex-row items-center justify-between gap-2.5">
+          <div class="flex items-center gap-2 w-full sm:w-auto justify-center">
+            <button id="btn-steal" onclick="attemptSteal()" disabled class="btn-3d px-3.5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm flex items-center gap-1">
+              <span>🏃</span> 도루 시도
+            </button>
+            <button id="btn-bunt" onclick="toggleSwingType()" class="btn-3d px-3.5 py-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs sm:text-sm flex items-center gap-1">
+              <span>🎯</span> <span id="swing-mode-label">강스윙 모드</span>
+            </button>
+          </div>
+
+          <button id="btn-swing" onclick="handleBatterSwing()" class="btn-3d w-full sm:flex-1 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-400 via-orange-500 to-rose-500 hover:from-amber-300 hover:to-rose-400 text-slate-950 font-game text-xl sm:text-2xl shadow-lg tracking-wider">
+            🏏 스윙! (터치 / 스페이스바)
+          </button>
+        </div>
+
+        <!-- B. 투수 수비 컨트롤 -->
+        <div id="controls-pitching" class="hidden flex flex-col gap-2">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <span class="text-xs font-bold text-blue-300">1. 구종 선택:</span>
+            <div class="flex gap-1.5 flex-1 justify-end">
+              <button onclick="selectPitchType('fastball')" id="pitch-fastball" class="pitch-btn px-3 py-1.5 rounded-lg bg-amber-500 text-slate-950 font-bold text-xs border-2 border-white">🔥 강속구</button>
+              <button onclick="selectPitchType('curve')" id="pitch-curve" class="pitch-btn px-3 py-1.5 rounded-lg bg-slate-700 text-white font-bold text-xs border border-slate-500">🌀 커브</button>
+              <button onclick="selectPitchType('fork')" id="pitch-fork" class="pitch-btn px-3 py-1.5 rounded-lg bg-slate-700 text-white font-bold text-xs border border-slate-500">⬇️ 포크볼</button>
+            </div>
+          </div>
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-bold text-emerald-300">2. 코스 & 투구:</span>
+            <div class="flex gap-2 flex-1">
+              <button onclick="throwPitch('strike')" class="btn-3d flex-1 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white font-game text-base">
+                ⚡ 스트라이크 존 승부!
+              </button>
+              <button onclick="throwPitch('ball')" class="btn-3d px-4 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-amber-300 font-bold text-xs sm:text-sm border border-amber-400/30">
+                유인구 (볼)
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ==================== 3. 홈런왕 경쟁 모드 화면 ==================== -->
+    <section id="screen-derby" class="hidden flex-1 flex flex-col gap-3">
+      <!-- 홈런왕 상단 전광판 -->
+      <div class="bg-gradient-to-r from-purple-950 via-indigo-950 to-slate-900 border-2 border-pink-500/40 rounded-2xl p-3 grid grid-cols-4 gap-2 text-center shadow-xl">
+        <div class="bg-black/40 rounded-xl p-2">
+          <div class="text-[10px] sm:text-xs text-pink-300">남은 공</div>
+          <div id="derby-balls" class="font-game text-lg sm:text-2xl text-white">10구</div>
+        </div>
+        <div class="bg-black/40 rounded-xl p-2">
+          <div class="text-[10px] sm:text-xs text-amber-300">홈런 개수</div>
+          <div id="derby-hrs" class="font-game text-lg sm:text-2xl text-amber-400">0 HR</div>
+        </div>
+        <div class="bg-black/40 rounded-xl p-2">
+          <div class="text-[10px] sm:text-xs text-emerald-300">누적 비거리</div>
+          <div id="derby-dist" class="font-game text-lg sm:text-2xl text-emerald-400">0 m</div>
+        </div>
+        <div class="bg-black/40 rounded-xl p-2">
+          <div class="text-[10px] sm:text-xs text-sky-300">콤보 보너스</div>
+          <div id="derby-combo" class="font-game text-lg sm:text-2xl text-sky-300">0 COMBO</div>
+        </div>
+      </div>
+
+      <!-- 홈런왕 캔버스 -->
+      <div id="derby-canvas-container" class="relative w-full h-[330px] sm:h-[400px] rounded-2xl overflow-hidden border-2 border-pink-500/50 shadow-2xl bg-indigo-950">
+        <canvas id="derby-canvas"></canvas>
+
+        <!-- 홈런왕 배너 -->
+        <div id="derby-banner" class="hidden pointer-events-none absolute inset-0 flex flex-col items-center justify-center z-20 px-4 text-center">
+          <div id="derby-banner-title" class="font-game text-4xl sm:text-6xl text-amber-300 drop-shadow-[0_5px_5px_rgba(0,0,0,0.9)]">
+            장외 홈런!!
+          </div>
+          <div id="derby-banner-sub" class="mt-1 px-4 py-1 rounded-full bg-black/75 text-white font-bold text-xs sm:text-base">
+            비거리 138m! +200점
+          </div>
+        </div>
+
+        <div class="absolute top-2.5 left-2.5 bg-black/65 px-3 py-1 rounded-full text-xs text-pink-200 font-bold border border-pink-400/30">
+          🔥 황금 공을 치면 점수와 비거리가 2배!
+        </div>
+      </div>
+
+      <!-- 홈런왕 스윙 버튼 -->
+      <div class="bg-slate-900 border border-pink-500/30 rounded-2xl p-3">
+        <button onclick="handleDerbySwing()" class="btn-3d w-full py-4 rounded-2xl bg-gradient-to-r from-pink-500 via-amber-400 to-orange-500 text-slate-950 font-game text-xl sm:text-2xl shadow-lg">
+          💥 풀스윙 홈런 날리기! (터치 / 스페이스바)
+        </button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==================== 모달 1: 타순 확인 / 대타 / 투수 교체 ==================== -->
+  <div id="modal-lineup" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3">
+    <div class="bg-slate-900 border-2 border-indigo-500/50 rounded-2xl w-full max-w-lg max-h-[88vh] flex flex-col overflow-hidden shadow-2xl animate-pop">
+      <div class="p-4 bg-slate-800 border-b border-slate-700 flex items-center justify-between">
+        <h3 class="font-game text-lg sm:text-xl text-amber-300">📋 작전 타임: 타순 & 선수 교체</h3>
+        <button onclick="closeLineupModal()" class="px-3 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-bold">닫기 ✕</button>
+      </div>
+
+      <div class="p-4 overflow-y-auto flex flex-col gap-4 text-xs sm:text-sm">
+        <!-- 투수 교체 섹션 -->
+        <div class="bg-slate-800/80 p-3 rounded-xl border border-rose-500/30">
+          <div class="flex items-center justify-between mb-2">
+            <span class="font-bold text-rose-300">⚾ 현재 투수 & 불펜 투수 교체</span>
+            <span id="modal-pitcher-info" class="text-xs text-slate-300">체력: 100%</span>
+          </div>
+          <div id="bullpen-list" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <!-- JS 렌더링 -->
+          </div>
+        </div>
+
+        <!-- 타순 확인 & 대타 교체 섹션 -->
+        <div class="bg-slate-800/80 p-3 rounded-xl border border-amber-500/30">
+          <div class="flex items-center justify-between mb-2">
+            <span class="font-bold text-amber-300">🏏 선발 타순 (1~9번) & 대타 투입</span>
+            <span class="text-[11px] text-emerald-300">찬스 때 대타를 써보세요!</span>
+          </div>
+          <div id="batting-order-list" class="flex flex-col gap-1.5">
+            <!-- JS 렌더링 -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 모달 2: 경기 / 홈런왕 결과 및 보상 팝업 ==================== -->
+  <div id="modal-result" class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-gradient-to-b from-slate-800 to-slate-950 border-2 border-amber-400 rounded-3xl w-full max-w-md p-6 text-center shadow-2xl animate-pop">
+      <div id="result-emoji" class="text-5xl sm:text-6xl mb-2">🏆</div>
+      <h2 id="result-title" class="font-game text-2xl sm:text-3xl text-amber-300 mb-1">경기 승리!!</h2>
+      <p id="result-desc" class="text-xs sm:text-sm text-slate-300 mb-4">김하람 감독님의 명지휘로 짜릿한 승리를 거뒀습니다!</p>
+
+      <div class="bg-slate-900/90 border border-slate-700 rounded-2xl p-4 mb-5 flex flex-col gap-2">
+        <div id="result-score-summary" class="font-game text-lg text-white border-b border-slate-800 pb-2">
+          내 팀 5 : 2 상대팀
+        </div>
+        <div class="flex justify-around pt-1">
+          <div>
+            <span class="text-xs text-blue-300 block">획득 포인트</span>
+            <span id="result-reward-points" class="font-game text-xl text-blue-400">+500 P</span>
+          </div>
+          <div>
+            <span class="text-xs text-amber-300 block">획득 코인</span>
+            <span id="result-reward-coins" class="font-game text-xl text-amber-400">+300 C</span>
+          </div>
+        </div>
+      </div>
+
+      <button onclick="closeResultAndGoHome()" class="btn-3d w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 font-game text-lg shadow-lg">
+        확인 및 로비로 돌아가기
+      </button>
+    </div>
+  </div>
+
+  <!-- 토스트 알림 메시지 (alert 대체) -->
+  <div id="toast-msg" class="hidden fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-amber-300 border border-amber-400/50 px-4 py-2 rounded-full text-xs sm:text-sm font-bold shadow-xl">
+    알림 메시지
+  </div>
+
+  <script>
+    /* =========================================================================
+       [1] 사운드 시스템 (Web Audio API - 외부 파일 없이 생생한 야구 효과음 합성)
+       ========================================================================= */
+    let audioCtx = null;
+    let soundEnabled = true;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      document.getElementById('btn-sound').textContent = soundEnabled ? '🔊' : '🔇';
+      showToast(soundEnabled ? '효과음이 켜졌습니다!' : '효과음이 꺼졌습니다.');
+    }
+
+    function playSFX(type) {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        if (type === 'pitch') {
+          // 투구 휙~ 소리
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(320, now);
+          osc.frequency.exponentialRampToValueAtTime(120, now + 0.18);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
+          osc.start(now);
+          osc.stop(now + 0.18);
+        } else if (type === 'hit') {
+          // 배트 딱! 타격음
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(650, now);
+          osc.frequency.exponentialRampToValueAtTime(140, now + 0.12);
+          gain.gain.setValueAtTime(0.45, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+          osc.start(now);
+          osc.stop(now + 0.12);
+        } else if (type === 'homerun') {
+          // 홈런 팡파레 화음
+          const freqs = [523.25, 659.25, 783.99, 1046.50];
+          freqs.forEach((f, i) => {
+            const o = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+            o.type = 'square';
+            o.frequency.setValueAtTime(f, now + i * 0.08);
+            g.gain.setValueAtTime(0.15, now + i * 0.08);
+            g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 0.45);
+            o.connect(g);
+            g.connect(audioCtx.destination);
+            o.start(now + i * 0.08);
+            o.stop(now + i * 0.08 + 0.45);
+          });
+        } else if (type === 'strike' || type === 'out') {
+          // 스트라이크/아웃 묵직한 소리
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(160, now);
+          osc.frequency.linearRampToValueAtTime(90, now + 0.25);
+          gain.gain.setValueAtTime(0.25, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+          osc.start(now);
+          osc.stop(now + 0.25);
+        } else if (type === 'coin') {
+          // 코인 획득 띠링~
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(987.77, now);
+          osc.frequency.setValueAtTime(1318.51, now + 0.08);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+          osc.start(now);
+          osc.stop(now + 0.3);
+        }
+      } catch (e) {
+        // 오디오 오류 무시
+      }
+    }
+
+    /* =========================================================================
+       [2] 게임 데이터 (구단, 대표 스타 선수, 유니폼 상점, 라인업)
+       ========================================================================= */
+    const TEAMS = [
+      { id: 'tigers', name: '블루 타이거즈', emoji: '🐯', color: '#2563eb', accent: '#60a5fa' },
+      { id: 'dragons', name: '레드 드래곤즈', emoji: '🐉', color: '#dc2626', accent: '#f87171' },
+      { id: 'lions', name: '골드 라이온즈', emoji: '🦁', color: '#d97706', accent: '#fbbf24' },
+      { id: 'eagles', name: '그린 이글스', emoji: '🦅', color: '#059669', accent: '#34d399' }
+    ];
+
+    const STAR_PLAYERS = [
+      { id: 'haram', name: '김하람 (천재 타자)', role: '4번 타자', buff: '홈런 파워 +25%', stat: '파워 S', powerBonus: 0.25, pitchBonus: 0 },
+      { id: 'ace', name: '강태풍 (광속 투수)', role: '선발 에이스', buff: '구속 & 삼진율 +25%', stat: '구속 162km', powerBonus: 0, pitchBonus: 0.25 },
+      { id: 'flash', name: '이번개 (슈퍼 주자)', role: '1번 유격수', buff: '안타 & 도루 성공 +30%', stat: '주력 S+', powerBonus: 0.12, pitchBonus: 0.1 }
+    ];
+
+    const UNIFORMS = [
+      { id: 'home', name: '기본 홈 유니폼', price: 0, jersey: '#ffffff', pants: '#f1f5f9', stripe: '#2563eb', cap: '#1d4ed8' },
+      { id: 'away', name: '원정 네이비', price: 200, jersey: '#1e293b', pants: '#cbd5e1', stripe: '#38bdf8', cap: '#0f172a' },
+      { id: 'gold', name: '올스타 황금 에디션', price: 400, jersey: '#f59e0b', pants: '#fef3c7', stripe: '#b45309', cap: '#d97706' },
+      { id: 'retro', name: '레트로 스트라이프', price: 350, jersey: '#fef08a', pants: '#fef9c3', stripe: '#dc2626', cap: '#b91c1c' },
+      { id: 'black', name: '블랙 드래곤 스페셜', price: 600, jersey: '#111827', pants: '#1f2937', stripe: '#f43f5e', cap: '#be123c' },
+      { id: 'mint', name: '슈퍼 민트 초코', price: 300, jersey: '#10b981', pants: '#ecfdf5', stripe: '#047857', cap: '#065f46' }
+    ];
+
+    // 사용자 진행 상태
+    const userState = {
+      points: 1000,
+      coins: 500, // 초기 체험용 500 코인 지급
+      myTeamId: 'tigers',
+      oppTeamId: 'dragons',
+      starPlayerId: 'haram',
+      ownedUniforms: ['home'],
+      equippedUniformId: 'home'
+    };
+
+    /* =========================================================================
+       [3] 로비 UI 렌더링 및 상점/팀 선택 로직
+       ========================================================================= */
+    function renderLobby() {
+      document.getElementById('header-points').textContent = `${userState.points.toLocaleString()} P`;
+      document.getElementById('header-coins').textContent = `${userState.coins.toLocaleString()} C`;
+
+      // 내 팀 목록
+      const myTeamGrid = document.getElementById('my-team-grid');
+      myTeamGrid.innerHTML = TEAMS.map(t => {
+        const selected = userState.myTeamId === t.id;
+        return `
+          <button onclick="selectMyTeam('${t.id}')" class="p-2.5 rounded-xl border-2 transition-all flex flex-col items-center gap-1 ${selected ? 'bg-blue-600/30 border-amber-400 scale-[1.03] shadow-lg' : 'bg-slate-900/70 border-slate-700 hover:border-slate-500'}">
+            <span class="text-2xl">${t.emoji}</span>
+            <span class="font-bold text-xs text-white">${t.name}</span>
+          </button>
+        `;
+      }).join('');
+
+      // 상대 팀 목록
+      const oppTeamGrid = document.getElementById('opp-team-grid');
+      oppTeamGrid.innerHTML = TEAMS.map(t => {
+        const selected = userState.oppTeamId === t.id;
+        const disabled = userState.myTeamId === t.id;
+        return `
+          <button onclick="selectOppTeam('${t.id}')" ${disabled ? 'disabled' : ''} class="p-2.5 rounded-xl border-2 transition-all flex flex-col items-center gap-1 ${disabled ? 'opacity-30 cursor-not-allowed border-slate-800 bg-slate-950' : selected ? 'bg-rose-600/30 border-rose-400 scale-[1.03] shadow-lg' : 'bg-slate-900/70 border-slate-700 hover:border-slate-500'}">
+            <span class="text-2xl">${t.emoji}</span>
+            <span class="font-bold text-xs text-white">${t.name}</span>
+          </button>
+        `;
+      }).join('');
+
+      // 대표 선수 1명 고르기
+      const starGrid = document.getElementById('star-player-grid');
+      starGrid.innerHTML = STAR_PLAYERS.map(p => {
+        const selected = userState.starPlayerId === p.id;
+        return `
+          <button onclick="selectStarPlayer('${p.id}')" class="p-2.5 rounded-xl border-2 text-left transition-all ${selected ? 'bg-indigo-600/40 border-amber-400 shadow-md' : 'bg-slate-800/80 border-slate-700 hover:border-slate-500'}">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-xs text-white">${p.name}</span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 font-bold">${p.stat}</span>
+            </div>
+            <div class="text-[11px] text-indigo-200 mt-1">✨ ${p.buff}</div>
+          </button>
+        `;
+      }).join('');
+
+      const activeStar = STAR_PLAYERS.find(p => p.id === userState.starPlayerId);
+      document.getElementById('selected-star-badge').textContent = `대표: ${activeStar.name.split(' ')[0]}`;
+
+      // 유니폼 상점 렌더링
+      const uniformGrid = document.getElementById('uniform-shop-grid');
+      uniformGrid.innerHTML = UNIFORMS.map(u => {
+        const owned = userState.ownedUniforms.includes(u.id);
+        const equipped = userState.equippedUniformId === u.id;
+        return `
+          <button onclick="handleUniformClick('${u.id}')" class="p-2 rounded-xl border transition-all flex flex-col items-center gap-1 ${equipped ? 'bg-amber-500/25 border-amber-400' : 'bg-slate-900/80 border-slate-700 hover:border-slate-500'}">
+            <!-- 미니 유니폼 아이콘 SVG -->
+            <svg width="34" height="34" viewBox="0 0 40 40">
+              <path d="M10 8 L16 5 L24 5 L30 8 L36 16 L30 20 L27 16 L27 34 L13 34 L13 16 L10 20 L4 16 Z" fill="${u.jersey}" stroke="${u.stripe}" stroke-width="2.5"/>
+              <line x1="20" y1="6" x2="20" y2="34" stroke="${u.stripe}" stroke-width="2"/>
+            </svg>
+            <span class="font-bold text-[11px] text-white truncate w-full text-center">${u.name}</span>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${equipped ? 'bg-amber-400 text-slate-950' : owned ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-amber-300'}">
+              ${equipped ? '착용중' : owned ? '착용하기' : `🪙 ${u.price} C`}
+            </span>
+          </button>
+        `;
+      }).join('');
+
+      const eqUni = UNIFORMS.find(u => u.id === userState.equippedUniformId);
+      document.getElementById('current-uniform-name').textContent = eqUni.name;
+    }
+
+    function selectMyTeam(id) {
+      userState.myTeamId = id;
+      if (userState.oppTeamId === id) {
+        const other = TEAMS.find(t => t.id !== id);
+        userState.oppTeamId = other.id;
+      }
+      renderLobby();
+    }
+
+    function selectOppTeam(id) {
+      if (id === userState.myTeamId) return;
+      userState.oppTeamId = id;
+      renderLobby();
+    }
+
+    function selectStarPlayer(id) {
+      userState.starPlayerId = id;
+      showToast('대표 스타 선수가 변경되었습니다!');
+      renderLobby();
+    }
+
+    function handleUniformClick(id) {
+      const uni = UNIFORMS.find(u => u.id === id);
+      if (userState.ownedUniforms.includes(id)) {
+        userState.equippedUniformId = id;
+        playSFX('coin');
+        showToast(`'${uni.name}' 유니폼을 착용했습니다!`);
+        renderLobby();
+      } else {
+        if (userState.coins >= uni.price) {
+          userState.coins -= uni.price;
+          userState.ownedUniforms.push(id);
+          userState.equippedUniformId = id;
+          playSFX('coin');
+          showToast(`🎉 '${uni.name}' 구매 및 착용 완료!`);
+          renderLobby();
+        } else {
+          showToast('코인이 부족합니다! 경기를 이겨 코인을 모아보세요!');
+        }
+      }
+    }
+
+    /* =========================================================================
+       [4] 정규 경기 엔진 (투수/타자, 도루, 비디오 판독, 대타, 투수교체)
+       ========================================================================= */
+    let game = null;
+    let animFrameId = null;
+
+    function createInitialLineup(starPlayer) {
+      const baseBatters = [
+        { order: 1, name: '이번개', pos: '중견수', avg: '.335', power: 0.72 },
+        { order: 2, name: '박민준', pos: '2루수', avg: '.310', power: 0.68 },
+        { order: 3, name: '최강타', pos: '3루수', avg: '.342', power: 0.88 },
+        { order: 4, name: '김하람', pos: '지명타자', avg: '.385', power: 0.98 },
+        { order: 5, name: '정거포', pos: '1루수', avg: '.298', power: 0.86 },
+        { order: 6, name: '한우직', pos: '좌익수', avg: '.285', power: 0.76 },
+        { order: 7, name: '오철벽', pos: '포수', avg: '.270', power: 0.70 },
+        { order: 8, name: '송유격', pos: '유격수', avg: '.290', power: 0.65 },
+        { order: 9, name: '윤질주', pos: '우익수', avg: '.280', power: 0.66 }
+      ];
+      // 대표 선수가 타자면 4번/1번에 특별 보너스 강조
+      if (starPlayer.id === 'haram') {
+        baseBatters[3].name = '⭐김하람';
+        baseBatters[3].power = 1.05;
+      } else if (starPlayer.id === 'flash') {
+        baseBatters[0].name = '⭐이번개';
+        baseBatters[0].power = 0.85;
+      }
+      return baseBatters;
+    }
+
+    function startRegularGame() {
+      initAudio();
+      const role = document.getElementById('select-play-role').value;
+      const maxInnings = parseInt(document.getElementById('select-innings').value, 10);
+      const myTeam = TEAMS.find(t => t.id === userState.myTeamId);
+      const oppTeam = TEAMS.find(t => t.id === userState.oppTeamId);
+      const starPlayer = STAR_PLAYERS.find(p => p.id === userState.starPlayerId);
+
+      game = {
+        mode: 'regular',
+        role: role, // 'both', 'batter', 'pitcher'
+        maxInnings: maxInnings,
+        inning: 1,
+        isTop: true, // 초: 상대 공격(내 수비), 말: 내 공격(내 타격)
+        myTeam,
+        oppTeam,
+        starPlayer,
+        awayScore: 0,
+        homeScore: 0,
+        balls: 0,
+        strikes: 0,
+        outs: 0,
+        bases: [false, false, false], // [1루, 2루, 3루]
+        varRemaining: 2,
+        lastClosePlay: null, // 비디오 판독용 데이터
+        swingMode: 'power', // 'power' or 'contact'
+        selectedPitch: 'fastball',
+        // 라인업 & 투수진
+        lineup: createInitialLineup(starPlayer),
+        batterIdx: 0,
+        benchBatters: [
+          { name: '🔥대타 강백호', pos: '대타', avg: '.360', power: 0.96, used: false },
+          { name: '⚡대타 손아섭', pos: '대타', avg: '.350', power: 0.88, used: false }
+        ],
+        pitchers: [
+          { name: starPlayer.id === 'ace' ? '⭐강태풍 (에이스)' : '류현진급 에이스', type: '선발', stamina: 100, speed: 158 },
+          { name: '🔥불펜 파이어볼러', type: '계투', stamina: 100, speed: 161 },
+          { name: '🛡️수호신 마무리', type: '마무리', stamina: 100, speed: 156 }
+        ],
+        currentPitcherIdx: 0,
+        // 캔버스 물리 애니메이션 상태
+        ballState: {
+          phase: 'idle', // 'idle', 'pitching', 'hit', 'result'
+          x: 0.5,
+          y: 0.55,
+          z: 0,
+          targetX: 0.5,
+          targetY: 0.82,
+          vx: 0,
+          vy: 0,
+          vz: 0,
+          progress: 0,
+          pitchType: 'fastball',
+          isStrikeZone: true,
+          hitTrail: []
+        },
+        batterSwingAnim: 0,
+        pitcherThrowAnim: 0,
+        autoPitchTimer: null
+      };
+
+      // 역할별 시작 이닝 설정
+      if (role === 'batter') {
+        game.isTop = false; // 말 공격만 플레이
+      } else if (role === 'pitcher') {
+        game.isTop = true; // 초 수비만 플레이
+      }
+
+      switchScreen('screen-game');
+      setupCanvas('stadium-canvas');
+      updateGameHUD();
+      prepareNextTurn();
+      startRenderLoop();
+    }
+
+    // 현재 유저가 공격(타자)인지 수비(투수)인지 판별
+    function isUserBatting() {
+      return !game.isTop;
+    }
+
+    function prepareNextTurn() {
+      if (!game || game.mode !== 'regular') return;
+      clearTimeout(game.autoPitchTimer);
+      hideVideoReview();
+
+      game.ballState.phase = 'idle';
+      game.ballState.x = 0.5;
+      game.ballState.y = 0.54;
+      game.ballState.z = 0;
+      game.ballState.hitTrail = [];
+
+      updateGameHUD();
+
+      if (isUserBatting()) {
+        // 유저 공격(타자): AI 투수가 1.3초 후 자동 투구
+        setCommentary(`${game.lineup[game.batterIdx].name} 타석! 투수가 투구를 준비합니다...`);
+        game.autoPitchTimer = setTimeout(() => {
+          triggerAIPitch();
+        }, 1200);
+      } else {
+        // 유저 수비(투수): 유저가 구종과 코스를 누를 때까지 대기
+        setCommentary('구종과 코스를 선택해 상대 타자를 삼진으로 잡으세요!');
+      }
+    }
+
+    // AI 투수가 유저 타자에게 공을 던짐
+    function triggerAIPitch() {
+      if (!game || game.ballState.phase !== 'idle') return;
+      const pitchTypes = ['fastball', 'curve', 'fork'];
+      const pType = pitchTypes[Math.floor(Math.random() * pitchTypes.length)];
+      const isStrike = Math.random() < 0.72; // 72% 스트라이크 존 투구
+
+      game.ballState.phase = 'pitching';
+      game.ballState.progress = 0;
+      game.ballState.pitchType = pType;
+      game.ballState.isStrikeZone = isStrike;
+      game.ballState.targetX = isStrike ? 0.5 + (Math.random() - 0.5) * 0.06 : 0.5 + (Math.random() > 0.5 ? 0.14 : -0.14);
+      game.ballState.targetY = isStrike ? 0.82 : 0.89;
+      game.pitcherThrowAnim = 1.0;
+
+      playSFX('pitch');
+      const pName = pType === 'fastball' ? '강속구' : pType === 'curve' ? '커브' : '포크볼';
+      setCommentary(`투수 제구! ${pName}가 날아옵니다!`);
+    }
+
+    // 유저 타자 스윙!
+    function handleBatterSwing() {
+      if (!game || !isUserBatting()) return;
+      initAudio();
+
+      if (game.ballState.phase === 'idle') {
+        showToast('투수가 공을 던진 뒤에 스윙하세요!');
+        return;
+      }
+      if (game.ballState.phase !== 'pitching') return;
+
+      game.batterSwingAnim = 1.0;
+      const p = game.ballState.progress; // 이상적인 타격 타이밍: 0.76 ~ 0.94
+      const diff = Math.abs(p - 0.85);
+      const batter = game.lineup[game.batterIdx];
+      const powerMult = batter.power + (game.swingMode === 'power' ? 0.12 : -0.05);
+
+      // 타이밍 판정
+      if (diff > 0.18) {
+        // 헛스윙 스트라이크
+        playSFX('strike');
+        game.ballState.phase = 'result';
+        showPlayBanner('헛스윙 스트라이크!', '타이밍이 맞지 않았습니다.', '#fbbf24');
+        addStrike();
+      } else if (diff > 0.12) {
+        // 파울!
+        playSFX('hit');
+        launchBallAnimation('foul');
+        showPlayBanner('파울!', '아깝게 선상을 벗어납니다!', '#94a3b8');
+        if (game.strikes < 2) {
+          game.strikes++;
+        }
+        updateGameHUD();
+        setTimeout(prepareNextTurn, 1400);
+      } else {
+        // 정타! 타이밍 정확도와 파워에 따라 안타/2루타/3루타/홈런/뜬공 결정
+        playSFX('hit');
+        const quality = (1 - diff / 0.12) * powerMult * (0.85 + Math.random() * 0.35);
+
+        if (quality >= 0.88) {
+          // 홈런!!
+          playSFX('homerun');
+          triggerScreenShake();
+          launchBallAnimation('homerun');
+          const dist = Math.floor(115 + Math.random() * 28);
+          showPlayBanner('홈런!! 💥', `담장을 훌쩍 넘기는 비거리 ${dist}m 초대형 홈런!`, '#fbbf24');
+          advanceRunners(4);
+        } else if (quality >= 0.72) {
+          // 3루타
+          launchBallAnimation('triple');
+          showPlayBanner('3루타!! 🔥', '우중간을 완전히 가르는 장타! 주자 3루까지!', '#34d399');
+          advanceRunners(3);
+        } else if (quality >= 0.56) {
+          // 2루타
+          launchBallAnimation('double');
+          showPlayBanner('2루타! ⚡', '좌중간 담장을 때리는 큼직한 2루타!', '#38bdf8');
+          advanceRunners(2);
+        } else if (quality >= 0.38) {
+          // 1루타 안타
+          launchBallAnimation('single');
+          showPlayBanner('안타! ⚾', '내야를 꿰뚫는 깔끔한 1루타!', '#a7f3d0');
+          advanceRunners(1);
+        } else {
+          // 뜬공 아웃 (가끔 비디오 판독 찬스 발생!)
+          launchBallAnimation('flyout');
+          const isClose = Math.random() < 0.35 && game.varRemaining > 0;
+          showPlayBanner('뜬공 아웃!', '외야수가 공을 잡아냅니다.', '#f87171');
+          addOut(isClose ? '1루에서 간발의 차로 세이프/아웃 접전! 비디오 판독을 요청할까요?' : null);
+        }
+      }
+    }
+
+    // 유저 투수 모드 조작
+    function selectPitchType(type) {
+      game.selectedPitch = type;
+      document.querySelectorAll('.pitch-btn').forEach(btn => {
+        btn.classList.remove('bg-amber-500', 'text-slate-950', 'border-2', 'border-white');
+        btn.classList.add('bg-slate-700', 'text-white', 'border', 'border-slate-500');
+      });
+      const activeBtn = document.getElementById(`pitch-${type}`);
+      activeBtn.classList.remove('bg-slate-700', 'text-white', 'border', 'border-slate-500');
+      activeBtn.classList.add('bg-amber-500', 'text-slate-950', 'border-2', 'border-white');
+    }
+
+    function throwPitch(zone) {
+      if (!game || isUserBatting() || game.ballState.phase !== 'idle') return;
+      initAudio();
+
+      const pitcher = game.pitchers[game.currentPitcherIdx];
+      pitcher.stamina = Math.max(15, pitcher.stamina - 4);
+      game.pitcherThrowAnim = 1.0;
+      game.ballState.phase = 'pitching';
+      game.ballState.progress = 0;
+      game.ballState.pitchType = game.selectedPitch;
+      game.ballState.isStrikeZone = (zone === 'strike');
+      game.ballState.targetX = zone === 'strike' ? 0.5 : 0.63;
+      game.ballState.targetY = zone === 'strike' ? 0.82 : 0.88;
+
+      playSFX('pitch');
+      setCommentary(`${pitcher.name}의 회심의 투구!`);
+    }
+
+    // 투수가 던진 공이 홈플레이트에 도달했을 때 결과 처리
+    function resolvePitchArrival() {
+      if (isUserBatting()) {
+        // 유저 타자가 스윙하지 않고 지켜본 경우
+        game.ballState.phase = 'result';
+        if (game.ballState.isStrikeZone) {
+          playSFX('strike');
+          showPlayBanner('루킹 스트라이크!', '스트라이크 존에 꽂혔습니다.', '#fbbf24');
+          addStrike();
+        } else {
+          showPlayBanner('볼!', '배트가 나가지 않았습니다.', '#34d399');
+          addBall();
+        }
+      } else {
+        // 유저 투수 모드: AI 타자의 반응 판정
+        const pitcher = game.pitchers[game.currentPitcherIdx];
+        const staminaFactor = pitcher.stamina / 100;
+        const starBonus = game.starPlayer.pitchBonus;
+        const strikeChance = (game.ballState.isStrikeZone ? 0.52 : 0.35) * staminaFactor + starBonus;
+
+        const roll = Math.random();
+        game.ballState.phase = 'result';
+
+        if (!game.ballState.isStrikeZone && roll > 0.42) {
+          // 유인구에 AI 타자가 참음 -> 볼
+          showPlayBanner('볼!', '상대 타자가 유인구에 속지 않았습니다.', '#94a3b8');
+          addBall();
+        } else if (roll < strikeChance) {
+          // 스트라이크 / 헛스윙!
+          playSFX('strike');
+          showPlayBanner('스트라이크! 🔥', '위력적인 공에 타자가 얼어붙었습니다!', '#38bdf8');
+          addStrike();
+        } else if (roll < strikeChance + 0.25) {
+          // 내야 뜬공 / 땅볼 아웃
+          playSFX('hit');
+          launchBallAnimation('flyout');
+          showPlayBanner('뜬공 아웃! 👏', '야수 정면으로 향하는 타구!', '#34d399');
+          addOut();
+        } else {
+          // 상대 타자 안타
+          playSFX('hit');
+          launchBallAnimation('single');
+          showPlayBanner('피안타!', '상대 타자가 안타를 쳐냈습니다.', '#f87171');
+          advanceRunners(1);
+        }
+      }
+    }
+
+    // 볼/스트라이크/아웃/진루 처리
+    function addStrike() {
+      game.strikes++;
+      if (game.strikes >= 3) {
+        game.strikes = 0;
+        game.balls = 0;
+        showPlayBanner('삼진 아웃!! ⚡', '삼구삼진! 타자가 물러납니다.', '#f43f5e');
+        nextBatter();
+        addOut();
+      } else {
+        updateGameHUD();
+        setTimeout(prepareNextTurn, 1300);
+      }
+    }
+
+    function addBall() {
+      game.balls++;
+      if (game.balls >= 4) {
+        game.balls = 0;
+        game.strikes = 0;
+        showPlayBanner('볼넷! 🚶', '침착하게 골라내어 1루로 걸어나갑니다!', '#34d399');
+        advanceRunners(1, true);
+      } else {
+        updateGameHUD();
+        setTimeout(prepareNextTurn, 1300);
+      }
+    }
+
+    function addOut(closePlayReason = null) {
+      game.balls = 0;
+      game.strikes = 0;
+      game.outs++;
+      updateGameHUD();
+
+      if (closePlayReason && isUserBatting()) {
+        // 비디오 판독 팝업 노출
+        game.lastClosePlay = { type: 'out_to_safe' };
+        document.getElementById('var-desc').textContent = closePlayReason;
+        document.getElementById('var-count-left').textContent = game.varRemaining;
+        document.getElementById('var-popup').classList.remove('hidden');
+        return;
+      }
+
+      if (game.outs >= 3) {
+        setTimeout(switchInningSide, 1500);
+      } else {
+        setTimeout(prepareNextTurn, 1400);
+      }
+    }
+
+    function advanceRunners(basesToAdvance, isWalk = false) {
+      game.balls = 0;
+      game.strikes = 0;
+      let runsScored = 0;
+
+      if (isWalk) {
+        // 밀어내기 볼넷 로직
+        if (game.bases[0] && game.bases[1] && game.bases[2]) {
+          runsScored++;
+        } else if (game.bases[0] && game.bases[1]) {
+          game.bases[2] = true;
+        } else if (game.bases[0]) {
+          game.bases[1] = true;
+        }
+        game.bases[0] = true;
+      } else {
+        // 안타/장타/홈런 진루
+        for (let step = 0; step < basesToAdvance; step++) {
+          if (game.bases[2]) runsScored++;
+          game.bases[2] = game.bases[1];
+          game.bases[1] = game.bases[0];
+          game.bases[0] = (step === 0);
+        }
+      }
+
+      if (runsScored > 0) {
+        if (game.isTop) game.awayScore += runsScored;
+        else game.homeScore += runsScored;
+        showToast(`🎉 ${runsScored}득점 성공!!`);
+      }
+
+      if (isUserBatting()) nextBatter();
+      updateGameHUD();
+      setTimeout(prepareNextTurn, 1600);
+    }
+
+    function nextBatter() {
+      game.batterIdx = (game.batterIdx + 1) % game.lineup.length;
+    }
+
+    // 도루 시도 (주자가 1루 또는 2루에 있을 때)
+    function attemptSteal() {
+      if (!game || !isUserBatting() || game.ballState.phase !== 'idle') return;
+      if (!game.bases[0] && !game.bases[1]) return;
+
+      clearTimeout(game.autoPitchTimer);
+      initAudio();
+
+      const successRate = userState.starPlayerId === 'flash' ? 0.85 : 0.65;
+      const isSafe = Math.random() < successRate;
+
+      if (isSafe) {
+        playSFX('coin');
+        if (game.bases[1] && !game.bases[2]) {
+          game.bases[2] = true;
+          game.bases[1] = false;
+        } else if (game.bases[0] && !game.bases[1]) {
+          game.bases[1] = true;
+          game.bases[0] = false;
+        }
+        showPlayBanner('도루 성공! 세이프! 🏃💨', '번개 같은 슬라이딩으로 베이스를 훔쳤습니다!', '#34d399');
+        updateGameHUD();
+        setTimeout(prepareNextTurn, 1400);
+      } else {
+        playSFX('out');
+        if (game.bases[1]) game.bases[1] = false;
+        else if (game.bases[0]) game.bases[0] = false;
+        showPlayBanner('도루 실패! 아웃!', '포수의 정확한 송구에 태그 아웃!', '#f87171');
+        addOut(game.varRemaining > 0 ? '2루 슬라이딩 태그 아웃 판정! 비디오 판독을 요청할까요?' : null);
+      }
+    }
+
+    // 비디오 판독 시스템
+    function requestVideoReview() {
+      if (!game || game.varRemaining <= 0) return;
+      game.varRemaining--;
+      hideVideoReview();
+      setCommentary('📺 심판진이 비디오 판독실과 교신 중입니다... (슬로우 모션 리플레이)');
+
+      setTimeout(() => {
+        const overturned = Math.random() < 0.65; // 65% 확률로 판정 번복 세이프!
+        if (overturned) {
+          playSFX('homerun');
+          game.outs = Math.max(0, game.outs - 1);
+          game.bases[0] = true;
+          nextBatter();
+          showPlayBanner('판정 번복! 세이프!! 🙌', '비디오 판독 결과 발이 먼저 베이스에 닿았습니다!', '#34d399');
+        } else {
+          playSFX('out');
+          showPlayBanner('원심 유지! 아웃!', '간발의 차이로 아웃이 인정됩니다.', '#f87171');
+        }
+        updateGameHUD();
+        if (game.outs >= 3) {
+          setTimeout(switchInningSide, 1500);
+        } else {
+          setTimeout(prepareNextTurn, 1500);
+        }
+      }, 1400);
+    }
+
+    function dismissVideoReview() {
+      hideVideoReview();
+      if (game.outs >= 3) {
+        switchInningSide();
+      } else {
+        prepareNextTurn();
+      }
+    }
+
+    function hideVideoReview() {
+      document.getElementById('var-popup').classList.add('hidden');
+    }
+
+    function toggleSwingType() {
+      if (!game) return;
+      game.swingMode = game.swingMode === 'power' ? 'contact' : 'power';
+      document.getElementById('swing-mode-label').textContent = game.swingMode === 'power' ? '강스윙 모드' : '정확 컨택트';
+      showToast(game.swingMode === 'power' ? '🔥 홈런을 노리는 강스윙 모드!' : '🎯 안타 확률이 높은 컨택트 모드!');
+    }
+
+    // 공수 교대 및 경기 종료 체크
+    function switchInningSide() {
+      game.outs = 0;
+      game.balls = 0;
+      game.strikes = 0;
+      game.bases = [false, false, false];
+
+      if (game.role === 'batter') {
+        // 타자 전용 모드는 매 이닝 말만 공격
+        if (game.inning >= game.maxInnings) {
+          finishRegularGame();
+          return;
+        }
+        game.inning++;
+        game.awayScore += Math.random() < 0.4 ? 1 : 0; // 상대팀 가상 득점
+      } else if (game.role === 'pitcher') {
+        // 투수 전용 모드는 매 이닝 초만 수비
+        if (game.inning >= game.maxInnings) {
+          finishRegularGame();
+          return;
+        }
+        game.inning++;
+        game.homeScore += Math.random() < 0.55 ? 1 : 0; // 우리팀 가상 득점
+      } else {
+        // 공수 교대 모드
+        if (game.isTop) {
+          game.isTop = false;
+        } else {
+          if (game.inning >= game.maxInnings) {
+            finishRegularGame();
+            return;
+          }
+          game.inning++;
+          game.isTop = true;
+        }
+      }
+
+      showPlayBanner('공수 교대!', `${game.inning}회${game.isTop ? '초' : '말'} 시작합니다!`, '#38bdf8');
+      updateGameHUD();
+      setTimeout(prepareNextTurn, 1500);
+    }
+
+    function finishRegularGame() {
+      clearTimeout(game.autoPitchTimer);
+      const isWin = game.homeScore >= game.awayScore;
+      const earnedCoins = isWin ? 300 : 100;
+      const earnedPoints = isWin ? 500 : 150;
+
+      userState.coins += earnedCoins;
+      userState.points += earnedPoints;
+      playSFX(isWin ? 'homerun' : 'coin');
+
+      document.getElementById('result-emoji').textContent = isWin ? '🏆' : '⚾';
+      document.getElementById('result-title').textContent = isWin ? '짜릿한 승리!!' : '아쉬운 석패!';
+      document.getElementById('result-desc').textContent = isWin
+        ? '김하람 기획자님의 멋진 작전으로 우승을 차지했습니다!'
+        : '다음 경기에서는 꼭 승리해 보아요! 참가 보상이 지급됩니다.';
+      document.getElementById('result-score-summary').textContent = `${game.myTeam.name} ${game.homeScore} : ${game.awayScore} ${game.oppTeam.name}`;
+      document.getElementById('result-reward-points').textContent = `+${earnedPoints} P`;
+      document.getElementById('result-reward-coins').textContent = `+${earnedCoins} C`;
+
+      document.getElementById('modal-result').classList.remove('hidden');
+    }
+
+    /* =========================================================================
+       [5] 타순 확인 / 대타 / 투수 교체 모달
+       ========================================================================= */
+    function openLineupModal() {
+      if (!game) return;
+      clearTimeout(game.autoPitchTimer);
+
+      // 투수 목록 렌더링
+      const bullpenEl = document.getElementById('bullpen-list');
+      bullpenEl.innerHTML = game.pitchers.map((p, idx) => {
+        const isCurrent = idx === game.currentPitcherIdx;
+        return `
+          <div class="p-2 rounded-lg border flex items-center justify-between ${isCurrent ? 'bg-rose-950/60 border-rose-400' : 'bg-slate-900 border-slate-700'}">
+            <div>
+              <div class="font-bold text-white text-xs">${p.name} (${p.type})</div>
+              <div class="text-[11px] text-slate-400">구속 ${p.speed}km • 체력 ${p.stamina}%</div>
+            </div>
+            ${isCurrent
+              ? '<span class="px-2 py-0.5 rounded bg-rose-500 text-white text-[10px] font-bold">등판중</span>'
+              : `<button onclick="changePitcher(${idx})" class="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold">투수 교체</button>`
+            }
+          </div>
+        `;
+      }).join('');
+
+      // 타순 목록 & 대타 버튼 렌더링
+      const orderEl = document.getElementById('batting-order-list');
+      const availablePinch = game.benchBatters.find(b => !b.used);
+
+      orderEl.innerHTML = game.lineup.map((b, idx) => {
+        const isCurrent = idx === game.batterIdx;
+        return `
+          <div class="px-2.5 py-1.5 rounded-lg border flex items-center justify-between ${isCurrent ? 'bg-amber-500/20 border-amber-400' : 'bg-slate-900/80 border-slate-700'}">
+            <div class="flex items-center gap-2">
+              <span class="w-5 h-5 rounded-full bg-slate-700 text-center text-[11px] leading-5 font-bold">${b.order}</span>
+              <div>
+                <span class="font-bold text-white text-xs">${b.name}</span>
+                <span class="text-[10px] text-slate-400 ml-1">(${b.pos} | 타율 ${b.avg})</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-1.5">
+              ${isCurrent ? '<span class="text-[10px] text-amber-300 font-bold">현재 타석</span>' : ''}
+              ${availablePinch && !b.isPinch ? `<button onclick="usePinchHitter(${idx})" class="px-2 py-0.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold">대타 투입</button>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      document.getElementById('modal-lineup').classList.remove('hidden');
+    }
+
+    function closeLineupModal() {
+      document.getElementById('modal-lineup').classList.add('hidden');
+      if (game && game.mode === 'regular' && game.ballState.phase === 'idle') {
+        prepareNextTurn();
+      }
+    }
+
+    function changePitcher(idx) {
+      game.currentPitcherIdx = idx;
+      playSFX('coin');
+      showToast(`⚾ 투수 교체! ${game.pitchers[idx].name} 선수가 마운드에 오릅니다!`);
+      updateGameHUD();
+      openLineupModal();
+    }
+
+    function usePinchHitter(lineupIdx) {
+      const pinch = game.benchBatters.find(b => !b.used);
+      if (!pinch) return;
+      pinch.used = true;
+      game.lineup[lineupIdx] = {
+        order: lineupIdx + 1,
+        name: pinch.name,
+        pos: '대타',
+        avg: pinch.avg,
+        power: pinch.power,
+        isPinch: true
+      };
+      playSFX('coin');
+      showToast(`🔥 대타 작전! ${pinch.name} 선수가 타석에 들어섭니다!`);
+      updateGameHUD();
+      openLineupModal();
+    }
+
+    /* =========================================================================
+       [6] 홈런왕 경쟁 모드 (아케이드 모드)
+       ========================================================================= */
+    let derby = null;
+
+    function startHomeRunDerby() {
+      initAudio();
+      const starPlayer = STAR_PLAYERS.find(p => p.id === userState.starPlayerId);
+      derby = {
+        ballsLeft: 10,
+        homeruns: 0,
+        totalDistance: 0,
+        combo: 0,
+        starPlayer,
+        ballState: {
+          phase: 'idle',
+          progress: 0,
+          isGolden: false,
+          hitTrail: []
+        },
+        batterSwingAnim: 0,
+        timer: null
+      };
+
+      switchScreen('screen-derby');
+      setupCanvas('derby-canvas');
+      updateDerbyHUD();
+      scheduleNextDerbyBall();
+      startRenderLoop();
+    }
+
+    function scheduleNextDerbyBall() {
+      if (!derby) return;
+      if (derby.ballsLeft <= 0) {
+        finishDerby();
+        return;
+      }
+      derby.ballState.phase = 'idle';
+      derby.ballState.progress = 0;
+      derby.ballState.hitTrail = [];
+
+      derby.timer = setTimeout(() => {
+        if (!derby) return;
+        derby.ballsLeft--;
+        derby.ballState.phase = 'pitching';
+        derby.ballState.progress = 0;
+        derby.ballState.isGolden = (derby.ballsLeft % 3 === 1); // 3구마다 황금 공!
+        updateDerbyHUD();
+        playSFX('pitch');
+      }, 1000);
+    }
+
+    function handleDerbySwing() {
+      if (!derby || derby.ballState.phase !== 'pitching') return;
+      initAudio();
+      derby.batterSwingAnim = 1.0;
+
+      const diff = Math.abs(derby.ballState.progress - 0.84);
+      if (diff <= 0.14) {
+        // 홈런 성공!
+        playSFX('homerun');
+        triggerScreenShake('derby-canvas-container');
+        derby.ballState.phase = 'hit';
+        derby.combo++;
+        const mult = derby.ballState.isGolden ? 2 : 1;
+        const baseDist = Math.floor(110 + (1 - diff / 0.14) * 35 + derby.starPlayer.powerBonus * 20);
+        const finalDist = baseDist * mult;
+
+        derby.homeruns += mult;
+        derby.totalDistance += finalDist;
+
+        const banner = document.getElementById('derby-banner');
+        document.getElementById('derby-banner-title').textContent = derby.ballState.isGolden ? '황금 홈런!! 🌟' : '홈런!! 💥';
+        document.getElementById('derby-banner-sub').textContent = `비거리 ${finalDist}m! (${derby.combo} COMBO)`;
+        banner.classList.remove('hidden');
+        setTimeout(() => banner.classList.add('hidden'), 1100);
+
+        updateDerbyHUD();
+        setTimeout(scheduleNextDerbyBall, 1200);
+      } else {
+        // 헛스윙
+        playSFX('strike');
+        derby.ballState.phase = 'miss';
+        derby.combo = 0;
+        updateDerbyHUD();
+        setTimeout(scheduleNextDerbyBall, 900);
+      }
+    }
+
+    function updateDerbyHUD() {
+      document.getElementById('derby-balls').textContent = `${derby.ballsLeft}구`;
+      document.getElementById('derby-hrs').textContent = `${derby.homeruns} HR`;
+      document.getElementById('derby-dist').textContent = `${derby.totalDistance} m`;
+      document.getElementById('derby-combo').textContent = `${derby.combo} COMBO`;
+    }
+
+    function finishDerby() {
+      const earnedCoins = derby.homeruns * 35 + 50;
+      const earnedPoints = derby.totalDistance + derby.homeruns * 100;
+      userState.coins += earnedCoins;
+      userState.points += earnedPoints;
+      playSFX('homerun');
+
+      document.getElementById('result-emoji').textContent = '🔥';
+      document.getElementById('result-title').textContent = '홈런왕 경쟁 종료!';
+      document.getElementById('result-desc').textContent = `총 ${derby.homeruns}개의 홈런으로 누적 비거리 ${derby.totalDistance}m를 달성했습니다!`;
+      document.getElementById('result-score-summary').textContent = `홈런 ${derby.homeruns}개 | 총 비거리 ${derby.totalDistance}m`;
+      document.getElementById('result-reward-points').textContent = `+${earnedPoints} P`;
+      document.getElementById('result-reward-coins').textContent = `+${earnedCoins} C`;
+
+      document.getElementById('modal-result').classList.remove('hidden');
+    }
+
+    /* =========================================================================
+       [7] HTML5 Canvas 생동감 있는 2.5D 야구장 & 유니폼 렌더링 엔진
+       ========================================================================= */
+    let activeCanvas = null;
+    let activeCtx = null;
+
+    function setupCanvas(canvasId) {
+      activeCanvas = document.getElementById(canvasId);
+      activeCtx = activeCanvas.getContext('2d');
+      resizeCanvas();
+    }
+
+    function resizeCanvas() {
+      if (!activeCanvas) return;
+      const rect = activeCanvas.parentElement.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      activeCanvas.width = rect.width * dpr;
+      activeCanvas.height = rect.height * dpr;
+      activeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    function launchBallAnimation(hitType) {
+      if (!game) return;
+      game.ballState.phase = 'hit';
+      game.ballState.progress = 0;
+      game.ballState.hitType = hitType;
+      game.ballState.hitTrail = [];
+    }
+
+    function startRenderLoop() {
+      if (animFrameId) cancelAnimationFrame(animFrameId);
+      function loop() {
+        renderFrame();
+        animFrameId = requestAnimationFrame(loop);
+      }
+      loop();
+    }
+
+    function renderFrame() {
+      if (!activeCanvas || !activeCtx) return;
+      const w = activeCanvas.width / (window.devicePixelRatio || 1);
+      const h = activeCanvas.height / (window.devicePixelRatio || 1);
+      const ctx = activeCtx;
+
+      // 1. 하늘 & 야구장 관중석 배경
+      const isDerby = !document.getElementById('screen-derby').classList.contains('hidden');
+      const skyGrad = ctx.createLinearGradient(0, 0, 0, h * 0.45);
+      if (isDerby) {
+        skyGrad.addColorStop(0, '#1e1b4b');
+        skyGrad.addColorStop(1, '#4c1d95');
+      } else {
+        skyGrad.addColorStop(0, '#0284c7');
+        skyGrad.addColorStop(1, '#7dd3fc');
+      }
+      ctx.fillStyle = skyGrad;
+      ctx.fillRect(0, 0, w, h * 0.45);
+
+      // 외야 관중석 & 조명탑
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(0, h * 0.28, w, h * 0.14);
+      // 관중 점묘 표현
+      for (let i = 0; i < w; i += 14) {
+        ctx.fillStyle = (i % 28 === 0) ? '#fbbf24' : '#38bdf8';
+        ctx.fillRect(i + 3, h * 0.31, 5, 5);
+        ctx.fillStyle = '#f43f5e';
+        ctx.fillRect(i + 7, h * 0.35, 5, 5);
+      }
+
+      // 외야 펜스 (홈런 담장)
+      ctx.fillStyle = isDerby ? '#be185d' : '#15803d';
+      ctx.fillRect(0, h * 0.39, w, h * 0.06);
+      ctx.fillStyle = '#facc15'; // 노란색 홈런 라인
+      ctx.fillRect(0, h * 0.39, w, 4);
+
+      // 2. 잔디 필드 (원근감 있는 투톤 잔디)
+      const grassGrad = ctx.createLinearGradient(0, h * 0.45, 0, h);
+      grassGrad.addColorStop(0, '#16a34a');
+      grassGrad.addColorStop(1, '#14532d');
+      ctx.fillStyle = grassGrad;
+      ctx.fillRect(0, h * 0.45, w, h * 0.55);
+
+      // 내야 흙 다이아몬드
+      ctx.fillStyle = '#b45309';
+      ctx.beginPath();
+      ctx.moveTo(w * 0.5, h * 0.50);
+      ctx.lineTo(w * 0.82, h * 0.72);
+      ctx.lineTo(w * 0.5, h * 0.96);
+      ctx.lineTo(w * 0.18, h * 0.72);
+      ctx.closePath();
+      ctx.fill();
+
+      // 투수 마운드
+      ctx.fillStyle = '#d97706';
+      ctx.beginPath();
+      ctx.ellipse(w * 0.5, h * 0.58, w * 0.06, h * 0.025, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 홈플레이트 & 타석 라인
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(w * 0.48, h * 0.85);
+      ctx.lineTo(w * 0.52, h * 0.85);
+      ctx.lineTo(w * 0.52, h * 0.87);
+      ctx.lineTo(w * 0.50, h * 0.89);
+      ctx.lineTo(w * 0.48, h * 0.87);
+      ctx.closePath();
+      ctx.fill();
+
+      // 1루, 2루, 3루 베이스 그리기
+      drawBase(ctx, w * 0.76, h * 0.71, !isDerby && game && game.bases[0]);
+      drawBase(ctx, w * 0.50, h * 0.52, !isDerby && game && game.bases[1]);
+      drawBase(ctx, w * 0.24, h * 0.71, !isDerby && game && game.bases[2]);
+
+      // 현재 장착 중인 유니폼 색상 가져오기
+      const equippedUni = UNIFORMS.find(u => u.id === userState.equippedUniformId);
+
+      // 3. 투수 캐릭터 그리기
+      drawPlayer(ctx, w * 0.5, h * 0.55, 0.75, {
+        jersey: (!isDerby && game && !isUserBatting()) ? equippedUni.jersey : '#ef4444',
+        cap: (!isDerby && game && !isUserBatting()) ? equippedUni.cap : '#991b1b',
+        isBatter: false
+      });
+
+      // 4. 타자 캐릭터 그리기 (상점 유니폼 적용!)
+      const swingAnim = isDerby ? (derby ? derby.batterSwingAnim : 0) : (game ? game.batterSwingAnim : 0);
+      drawPlayer(ctx, w * 0.41, h * 0.83, 1.15, {
+        jersey: (isDerby || (game && isUserBatting())) ? equippedUni.jersey : '#3b82f6',
+        cap: (isDerby || (game && isUserBatting())) ? equippedUni.cap : '#1d4ed8',
+        isBatter: true,
+        swingProgress: swingAnim
+      });
+
+      if (isDerby && derby && derby.batterSwingAnim > 0) {
+        derby.batterSwingAnim = Math.max(0, derby.batterSwingAnim - 0.08);
+      } else if (game && game.batterSwingAnim > 0) {
+        game.batterSwingAnim = Math.max(0, game.batterSwingAnim - 0.08);
+      }
+
+      // 5. 스트라이크 존 & 타이밍 링 표시 (타격 중일 때)
+      const stateObj = isDerby ? derby : game;
+      if (stateObj && stateObj.ballState.phase === 'pitching') {
+        // 스트라이크 존 박스
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(w * 0.46, h * 0.77, w * 0.08, h * 0.09);
+
+        // 공 진행 업데이트
+        const speed = isDerby ? 0.022 : (stateObj.ballState.pitchType === 'fastball' ? 0.025 : 0.019);
+        stateObj.ballState.progress += speed;
+
+        const t = stateObj.ballState.progress;
+        const curveOffset = stateObj.ballState.pitchType === 'curve' ? Math.sin(t * Math.PI) * 35 : 0;
+        const bx = w * (0.5 + (0) * t) + curveOffset;
+        const by = h * (0.55 + (0.83 - 0.55) * t);
+        const radius = 4 + t * 7;
+
+        // 타이밍 링 (공이 홈플레이트에 가까워질수록 노란 원과 겹침)
+        ctx.strokeStyle = (t >= 0.74 && t <= 0.94) ? '#facc15' : 'rgba(255,255,255,0.4)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(w * 0.5, h * 0.83, 18, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 야구공 그리기
+        ctx.fillStyle = (isDerby && stateObj.ballState.isGolden) ? '#facc15' : '#ffffff';
+        ctx.beginPath();
+        ctx.arc(bx, by, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#dc2626';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // 공이 지나가버린 경우
+        if (t >= 1.0) {
+          if (isDerby) {
+            stateObj.ballState.phase = 'miss';
+            derby.combo = 0;
+            updateDerbyHUD();
+            setTimeout(scheduleNextDerbyBall, 800);
+          } else {
+            resolvePitchArrival();
+          }
+        }
+      } else if (stateObj && stateObj.ballState.phase === 'hit') {
+        // 타격 후 외야로 날아가는 공 궤적
+        stateObj.ballState.progress = Math.min(1, stateObj.ballState.progress + 0.03);
+        const ht = stateObj.ballState.progress;
+        const endX = isDerby ? w * 0.5 : (game.ballState.hitType === 'foul' ? w * 0.92 : w * 0.55);
+        const endY = (isDerby || (game && game.ballState.hitType === 'homerun')) ? h * 0.18 : h * 0.44;
+        const arcHeight = Math.sin(ht * Math.PI) * (h * 0.35);
+
+        const bx = w * 0.5 + (endX - w * 0.5) * ht;
+        const by = h * 0.83 + (endY - h * 0.83) * ht - arcHeight;
+
+        stateObj.ballState.hitTrail.push({ x: bx, y: by });
+        if (stateObj.ballState.hitTrail.length > 12) stateObj.ballState.hitTrail.shift();
+
+        // 불꽃 궤적
+        stateObj.ballState.hitTrail.forEach((pt, i) => {
+          ctx.fillStyle = `rgba(251, 191, 36, ${i / 12})`;
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, 4 + i * 0.3, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(bx, by, 7, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function drawBase(ctx, x, y, occupied) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(Math.PI / 4);
+      ctx.fillStyle = occupied ? '#facc15' : '#ffffff';
+      ctx.fillRect(-7, -7, 14, 14);
+      ctx.restore();
+      if (occupied) {
+        // 주자 표시 아이콘
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(x, y - 12, 6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function drawPlayer(ctx, x, y, scale, opts) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(scale, scale);
+
+      // 그림자
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.beginPath();
+      ctx.ellipse(0, 16, 12, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 유니폼 몸통
+      ctx.fillStyle = opts.jersey;
+      ctx.beginPath();
+      ctx.roundRect(-9, -8, 18, 20, 5);
+      ctx.fill();
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // 머리 & 야구 모자
+      ctx.fillStyle = '#fed7aa';
+      ctx.beginPath();
+      ctx.arc(0, -15, 8, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = opts.cap;
+      ctx.beginPath();
+      ctx.arc(0, -17, 8, Math.PI, 0);
+      ctx.fill();
+      ctx.fillRect(0, -18, 11, 3); // 모자 챙
+
+      // 타자 배트
+      if (opts.isBatter) {
+        ctx.save();
+        ctx.translate(8, -4);
+        const angle = opts.swingProgress > 0 ? -Math.PI * 0.8 + opts.swingProgress * Math.PI * 1.4 : -Math.PI * 0.35;
+        ctx.rotate(angle);
+        ctx.fillStyle = '#d97706';
+        ctx.fillRect(0, -2, 24, 4);
+        ctx.restore();
+      }
+
+      ctx.restore();
+    }
+
+    /* =========================================================================
+       [8] UI 업데이트 및 유틸리티 함수
+       ========================================================================= */
+    function updateGameHUD() {
+      if (!game) return;
+      document.getElementById('sb-away-name').textContent = game.oppTeam.name;
+      document.getElementById('sb-home-name').textContent = game.myTeam.name;
+      document.getElementById('sb-away-badge').style.backgroundColor = game.oppTeam.color;
+      document.getElementById('sb-home-badge').style.backgroundColor = game.myTeam.color;
+      document.getElementById('sb-away-score').textContent = game.awayScore;
+      document.getElementById('sb-home-score').textContent = game.homeScore;
+
+      const sideText = isUserBatting() ? '말 (공격)' : '초 (수비)';
+      document.getElementById('sb-inning').textContent = `${game.inning}회${sideText}`;
+
+      // B/S/O 점등
+      for (let i = 1; i <= 3; i++) {
+        document.getElementById(`dot-b${i}`).className = `w-2.5 h-2.5 rounded-full ${game.balls >= i ? 'bg-emerald-400 shadow-[0_0_6px_#34d399]' : 'bg-slate-700'}`;
+      }
+      for (let i = 1; i <= 2; i++) {
+        document.getElementById(`dot-s${i}`).className = `w-2.5 h-2.5 rounded-full ${game.strikes >= i ? 'bg-amber-400 shadow-[0_0_6px_#fbbf24]' : 'bg-slate-700'}`;
+        document.getElementById(`dot-o${i}`).className = `w-2.5 h-2.5 rounded-full ${game.outs >= i ? 'bg-rose-500 shadow-[0_0_6px_#f43f5e]' : 'bg-slate-700'}`;
+      }
+
+      // 베이스 주자 상태
+      for (let b = 1; b <= 3; b++) {
+        const el = document.getElementById(`base-${b}`);
+        if (game.bases[b - 1]) {
+          el.classList.remove('bg-slate-800', 'border-slate-400');
+          el.classList.add('bg-amber-400', 'border-white', 'shadow-[0_0_8px_#fbbf24]');
+        } else {
+          el.classList.remove('bg-amber-400', 'border-white', 'shadow-[0_0_8px_#fbbf24]');
+          el.classList.add('bg-slate-800', 'border-slate-400');
+        }
+      }
+
+      // 현재 투수 & 타자 정보
+      const p = game.pitchers[game.currentPitcherIdx];
+      const bat = game.lineup[game.batterIdx];
+      document.getElementById('hud-pitcher-name').textContent = isUserBatting() ? `${game.oppTeam.name} 투수` : p.name;
+      document.getElementById('hud-pitcher-stamina').textContent = isUserBatting() ? '구위 양호' : `${p.stamina}%`;
+      document.getElementById('hud-batter-name').textContent = isUserBatting() ? `${bat.order}번 ${bat.name}` : `${game.oppTeam.name} 타자`;
+      document.getElementById('hud-batter-stat').textContent = isUserBatting() ? `타율 ${bat.avg}` : '경계 대상';
+
+      // 조작 버튼 패널 전환
+      const batCtrl = document.getElementById('controls-batting');
+      const pitCtrl = document.getElementById('controls-pitching');
+      if (isUserBatting()) {
+        batCtrl.classList.remove('hidden');
+        pitCtrl.classList.add('hidden');
+        // 도루 가능 여부 체크 (1루나 2루에 주자가 있고 앞 베이스가 비어있을 때)
+        const canSteal = (game.bases[0] && !game.bases[1]) || (game.bases[1] && !game.bases[2]);
+        document.getElementById('btn-steal').disabled = !canSteal;
+      } else {
+        batCtrl.classList.add('hidden');
+        pitCtrl.classList.remove('hidden');
+      }
+    }
+
+    function showPlayBanner(title, sub, color) {
+      const banner = document.getElementById('play-banner');
+      const titleEl = document.getElementById('play-banner-title');
+      const subEl = document.getElementById('play-banner-sub');
+      titleEl.textContent = title;
+      titleEl.style.color = color;
+      subEl.textContent = sub;
+
+      banner.classList.remove('hidden');
+      banner.classList.remove('animate-pop');
+      void banner.offsetWidth;
+      banner.classList.add('animate-pop');
+
+      setTimeout(() => {
+        banner.classList.add('hidden');
+      }, 1250);
+    }
+
+    function setCommentary(text) {
+      document.getElementById('cast-commentary').textContent = text;
+    }
+
+    function triggerScreenShake(containerId = 'canvas-container') {
+      const el = document.getElementById(containerId);
+      el.classList.remove('animate-shake');
+      void el.offsetWidth;
+      el.classList.add('animate-shake');
+    }
+
+    function switchScreen(screenId) {
+      ['screen-lobby', 'screen-game', 'screen-derby'].forEach(id => {
+        document.getElementById(id).classList.add('hidden');
+      });
+      document.getElementById(screenId).classList.remove('hidden');
+
+      const homeNav = document.getElementById('btn-home-nav');
+      if (screenId === 'screen-lobby') {
+        homeNav.classList.add('hidden');
+      } else {
+        homeNav.classList.remove('hidden');
+      }
+    }
+
+    function goHome() {
+      if (game) clearTimeout(game.autoPitchTimer);
+      if (derby) clearTimeout(derby.timer);
+      game = null;
+      derby = null;
+      if (animFrameId) cancelAnimationFrame(animFrameId);
+      switchScreen('screen-lobby');
+      renderLobby();
+    }
+
+    function closeResultAndGoHome() {
+      document.getElementById('modal-result').classList.add('hidden');
+      goHome();
+    }
+
+    let toastTimer = null;
+    function showToast(msg) {
+      const el = document.getElementById('toast-msg');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.add('hidden'), 2200);
+    }
+
+    // 키보드 스페이스바로 스윙 지원
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        if (!document.getElementById('screen-game').classList.contains('hidden')) {
+          e.preventDefault();
+          handleBatterSwing();
+        } else if (!document.getElementById('screen-derby').classList.contains('hidden')) {
+          e.preventDefault();
+          handleDerbySwing();
+        }
+      }
+    });
+
+    // 초기 로비 렌더링 실행
+    window.onload = function () {
+      renderLobby();
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,1449 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>스피드 덧셈 뺄셈! - 게임 기획: 강서연 어린이</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@500;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --font-jua: 'Jua', sans-serif;
+      --font-sans: 'Noto Sans KR', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: linear-gradient(135deg, #FFF7E8 0%, #FFEBF0 50%, #E8F6FF 100%);
+      min-height: 100vh;
+      overflow-x: hidden;
+      color: #334155;
+    }
+
+    .font-jua {
+      font-family: var(--font-jua);
+    }
+
+    /* 3D 젤리 버튼 스타일 */
+    .jelly-btn {
+      transition: transform 0.1s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.1s ease;
+    }
+    .jelly-btn:active {
+      transform: translateY(4px) scale(0.97);
+    }
+
+    /* 둥실둥실 애니메이션 */
+    @keyframes floaty {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-7px) rotate(1.5deg); }
+    }
+    .animate-float {
+      animation: floaty 3s ease-in-out infinite;
+    }
+
+    /* 흔들림(오답) 애니메이션 */
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-8px); }
+      40% { transform: translateX(8px); }
+      60% { transform: translateX(-6px); }
+      80% { transform: translateX(6px); }
+    }
+    .animate-shake {
+      animation: shake 0.35s ease-in-out;
+    }
+
+    /* 팝업 등장 애니메이션 */
+    @keyframes popIn {
+      0% { transform: scale(0.6); opacity: 0; }
+      75% { transform: scale(1.06); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .animate-pop {
+      animation: popIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    /* 점수 떠오름 애니메이션 */
+    @keyframes floatUpFade {
+      0% { transform: translateY(0) scale(0.8); opacity: 0; }
+      20% { transform: translateY(-10px) scale(1.1); opacity: 1; }
+      80% { transform: translateY(-35px) scale(1); opacity: 1; }
+      100% { transform: translateY(-50px) scale(0.95); opacity: 0; }
+    }
+    .score-popup {
+      animation: floatUpFade 1.1s ease-out forwards;
+      pointer-events: none;
+    }
+
+    /* 아기자기 방 배경 패턴 */
+    .room-wall {
+      background: linear-gradient(180deg, #FFFDF7 0%, #FFF4DC 100%);
+      background-image: radial-gradient(#FDE68A 1.5px, transparent 1.5px);
+      background-size: 22px 22px;
+    }
+    .room-floor {
+      background: repeating-linear-gradient(
+        90deg,
+        #F5D0A9 0px,
+        #F5D0A9 38px,
+        #EBC094 38px,
+        #EBC094 40px
+      );
+      border-top: 4px solid #D9A773;
+    }
+
+    /* 배치된 가구 스타일 */
+    .placed-furniture {
+      position: absolute;
+      cursor: grab;
+      transition: filter 0.15s ease, transform 0.15s ease;
+      touch-action: none;
+    }
+    .placed-furniture:hover {
+      filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.18));
+      transform: scale(1.05);
+      z-index: 30 !important;
+    }
+    .placed-furniture:active {
+      cursor: grabbing;
+      transform: scale(1.1);
+    }
+
+    /* 커스텀 스크롤바 */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.4);
+      border-radius: 10px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+<body class="p-2 sm:p-4 md:p-6">
+
+  <!-- 폭죽 효과용 캔버스 -->
+  <canvas id="confettiCanvas" class="fixed inset-0 pointer-events-none z-50"></canvas>
+
+  <!-- 메인 컨테이너 -->
+  <div class="max-w-6xl mx-auto">
+
+    <!-- 상단 헤더: 타이틀 바로 옆에 '✨ 게임 기획: 강서연 어린이' 배지만 깔끔하게 배치 -->
+    <header class="bg-white/90 backdrop-blur-md rounded-3xl shadow-lg border-4 border-amber-200 px-4 py-3 mb-4 flex flex-wrap items-center justify-between gap-2">
+      <div class="flex items-center gap-2.5">
+        <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white font-jua text-2xl shadow-md shrink-0">
+          +-
+        </div>
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="font-jua text-2xl sm:text-3xl text-slate-800 tracking-wide leading-none">
+              스피드 <span class="text-sky-500">덧셈</span> <span class="text-pink-500">뺄셈!</span>
+            </h1>
+            <span class="bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-800 border-2 border-amber-300 font-jua text-xs sm:text-sm px-3 py-0.5 rounded-full shadow-xs">
+              ✨ 게임 기획: 강서연 어린이
+            </span>
+          </div>
+          <p class="text-xs text-slate-500 font-bold mt-1">빠르게 풀고 15레벨 황금 방을 완성하자!</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <!-- AI 속도 난이도 선택 -->
+        <div id="aiSpeedBadge" class="hidden sm:flex items-center gap-1.5 bg-slate-100 px-3 py-1.5 rounded-2xl border border-slate-200 text-xs font-bold text-slate-600">
+          <span>컴퓨터 속도:</span>
+          <select id="aiDifficultySelect" onchange="changeAiDifficulty(this.value)" class="bg-white rounded-lg px-2 py-0.5 border border-slate-300 text-slate-700 font-bold focus:outline-none">
+            <option value="easy">느긋함</option>
+            <option value="normal" selected>보통</option>
+            <option value="fast">빠름</option>
+          </select>
+        </div>
+
+        <!-- 효과음 토글 -->
+        <button id="soundToggleBtn" onclick="toggleSound()" class="jelly-btn bg-amber-100 hover:bg-amber-200 text-amber-800 border-2 border-amber-300 rounded-2xl px-3 py-2 font-jua text-sm flex items-center gap-1 shadow-sm" title="소리 켜기/끄기">
+          <span id="soundIcon">🔊</span>
+          <span class="hidden sm:inline" id="soundText">소리 켜짐</span>
+        </button>
+
+        <!-- 처음으로(캐릭터 변경) 버튼 -->
+        <button id="resetToMenuBtn" onclick="openConfirmReset()" class="hidden jelly-btn bg-slate-100 hover:bg-slate-200 text-slate-700 border-2 border-slate-300 rounded-2xl px-3 py-2 font-jua text-sm shadow-sm">
+          🏠 캐릭터 다시 고르기
+        </button>
+      </div>
+    </header>
+
+    <!-- [화면 1] 캐릭터 선택 화면 (상단 중복 배지 제거됨) -->
+    <section id="characterSelectScreen" class="bg-white/95 rounded-3xl shadow-xl border-4 border-sky-200 p-5 sm:p-8 text-center animate-pop">
+      <h2 class="font-jua text-3xl sm:text-4xl text-slate-800 mb-2">함께 대결할 캐릭터를 선택하세요!</h2>
+      <p class="text-slate-500 font-bold text-sm sm:text-base mb-6">
+        내가 고르지 않은 캐릭터는 <span class="text-rose-500 underline decoration-wavy">컴퓨터(AI)</span>가 조종해서 실시간으로 대결해요!
+      </p>
+
+      <!-- 캐릭터 카드 2종 -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-3xl mx-auto mb-7">
+        <!-- 덧세미 카드 -->
+        <div onclick="selectCharacter('add')" class="jelly-btn cursor-pointer group relative bg-gradient-to-b from-sky-50 to-amber-50 hover:from-sky-100 hover:to-amber-100 rounded-3xl p-6 border-4 border-sky-300 hover:border-sky-500 shadow-lg transition-all">
+          <div class="absolute top-3 right-3 bg-sky-500 text-white font-jua text-xs px-3 py-1 rounded-full shadow">
+            덧셈 마스터 +
+          </div>
+          <div class="w-32 h-32 mx-auto mb-3 animate-float" id="previewAddChar"></div>
+          <h3 class="font-jua text-3xl text-sky-600 mb-1">덧세미</h3>
+          <p class="text-sm font-bold text-slate-600 mb-3">"하나에 하나를 더하면 힘이 쑥쑥!"</p>
+          <div class="bg-white/80 rounded-2xl p-3 text-xs text-slate-600 font-bold border border-sky-200">
+            🔵 특기: 밝고 명랑한 덧셈(+) 문제 중심!<br/>
+            ⚡ 빠른 계산으로 포인트를 쭉쭉 모아요.
+          </div>
+          <div class="mt-4 bg-sky-500 group-hover:bg-sky-600 text-white font-jua text-xl py-2.5 rounded-2xl shadow-md">
+            덧세미로 시작하기!
+          </div>
+        </div>
+
+        <!-- 뺄세미 카드 -->
+        <div onclick="selectCharacter('sub')" class="jelly-btn cursor-pointer group relative bg-gradient-to-b from-pink-50 to-purple-50 hover:from-pink-100 hover:to-purple-100 rounded-3xl p-6 border-4 border-pink-300 hover:border-pink-500 shadow-lg transition-all">
+          <div class="absolute top-3 right-3 bg-pink-500 text-white font-jua text-xs px-3 py-1 rounded-full shadow">
+            뺄셈 마스터 -
+          </div>
+          <div class="w-32 h-32 mx-auto mb-3 animate-float" style="animation-delay: 0.4s;" id="previewSubChar"></div>
+          <h3 class="font-jua text-3xl text-pink-600 mb-1">뺄세미</h3>
+          <p class="text-sm font-bold text-slate-600 mb-3">"척척 덜어내면 정답이 짠!"</p>
+          <div class="bg-white/80 rounded-2xl p-3 text-xs text-slate-600 font-bold border border-pink-200">
+            🩷 특기: 재빠르고 똑똑한 뺄셈(-) 문제 중심!<br/>
+            ⚡ 정확한 암산으로 컴퓨터를 이겨요.
+          </div>
+          <div class="mt-4 bg-pink-500 group-hover:bg-pink-600 text-white font-jua text-xl py-2.5 rounded-2xl shadow-md">
+            뺄세미로 시작하기!
+          </div>
+        </div>
+      </div>
+
+      <!-- 기획서 규칙 안내 배너 -->
+      <div class="max-w-3xl mx-auto bg-amber-50/90 rounded-2xl p-4 border-2 border-amber-200 text-left grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs sm:text-sm">
+        <div class="bg-white rounded-xl p-3 shadow-sm border border-amber-100">
+          <div class="font-jua text-base text-amber-600 mb-1">⏱️ 스피드 포인트 규칙</div>
+          <p class="text-slate-600 font-bold leading-relaxed">
+            <span class="text-sky-600">1.0초 이하</span> 정답 시 <b>20pt</b>!<br/>
+            <span class="text-pink-600">5.5초 이상</span> 정답 시 <b>10pt</b>!<br/>
+            0.5초마다 1포인트씩 달라져요!
+          </p>
+        </div>
+        <div class="bg-white rounded-xl p-3 shadow-sm border border-amber-100">
+          <div class="font-jua text-base text-emerald-600 mb-1">🆙 100pt마다 레벨업!</div>
+          <p class="text-slate-600 font-bold leading-relaxed">
+            100포인트를 모을 때마다 레벨이 오르고 <b>새로운 가구</b>가 열려요!
+          </p>
+        </div>
+        <div class="bg-white rounded-xl p-3 shadow-sm border border-amber-100">
+          <div class="font-jua text-base text-purple-600 mb-1">🏆 15레벨 게임 클리어!</div>
+          <p class="text-slate-600 font-bold leading-relaxed">
+            15가지 예쁜 가구로 나만의 방을 가득 꾸미면 게임 클리어!
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- [화면 2] 메인 게임 + 방 꾸미기 통합 화면 -->
+    <main id="gamePlayScreen" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+      <!-- 왼쪽: 실시간 대결 & 연산 문제 영역 (7칸) -->
+      <div class="lg:col-span-7 flex flex-col gap-4">
+
+        <!-- 사람 vs 컴퓨터 실시간 게이지 & 스코어보드 -->
+        <div class="bg-white/95 rounded-3xl shadow-lg border-4 border-amber-200 p-4">
+          <div class="flex items-center justify-between mb-2">
+            <span class="font-jua text-base sm:text-lg text-slate-700 flex items-center gap-1.5">
+              ⚡ 실시간 스피드 대결 현황
+            </span>
+            <span id="battleStatusText" class="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">
+              내가 앞서고 있어요! 🔥
+            </span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <!-- 플레이어 카드 -->
+            <div id="playerStatusCard" class="rounded-2xl p-3 border-2 border-sky-300 bg-sky-50/70 relative overflow-hidden">
+              <div class="flex items-center gap-2.5">
+                <div id="playerAvatarSmall" class="w-12 h-12 shrink-0"></div>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-1">
+                    <span class="bg-sky-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">나 (플레이어)</span>
+                    <span id="playerCharName" class="font-jua text-base text-slate-800 truncate">덧세미</span>
+                  </div>
+                  <div class="font-jua text-xl sm:text-2xl text-sky-600 leading-tight mt-0.5">
+                    Lv.<span id="playerLevelDisplay">1</span>
+                    <span class="text-xs sm:text-sm text-slate-500 font-sans font-bold">(<span id="playerPointsDisplay">0</span> pt)</span>
+                  </div>
+                </div>
+              </div>
+              <!-- 다음 레벨까지 진행 바 -->
+              <div class="mt-2">
+                <div class="flex justify-between text-[11px] font-bold text-slate-500 mb-0.5">
+                  <span>다음 레벨까지</span>
+                  <span><span id="levelProgressText">0</span> / 100 pt</span>
+                </div>
+                <div class="w-full h-3 bg-white rounded-full overflow-hidden border border-sky-200">
+                  <div id="playerLevelBar" class="h-full bg-gradient-to-r from-sky-400 to-blue-500 transition-all duration-300 rounded-full" style="width: 0%"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 컴퓨터(AI) 카드 -->
+            <div id="aiStatusCard" class="rounded-2xl p-3 border-2 border-pink-300 bg-pink-50/70 relative overflow-hidden">
+              <div class="flex items-center gap-2.5">
+                <div id="aiAvatarSmall" class="w-12 h-12 shrink-0"></div>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-1">
+                    <span class="bg-slate-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">컴퓨터 AI</span>
+                    <span id="aiCharName" class="font-jua text-base text-slate-800 truncate">뺄세미</span>
+                  </div>
+                  <div class="font-jua text-xl sm:text-2xl text-pink-600 leading-tight mt-0.5">
+                    Lv.<span id="aiLevelDisplay">1</span>
+                    <span class="text-xs sm:text-sm text-slate-500 font-sans font-bold">(<span id="aiPointsDisplay">0</span> pt)</span>
+                  </div>
+                </div>
+              </div>
+              <!-- 컴퓨터 문제 풀이 진행 바 -->
+              <div class="mt-2">
+                <div class="flex justify-between text-[11px] font-bold text-slate-500 mb-0.5">
+                  <span id="aiThinkingLabel">AI 계산 중...</span>
+                  <span>문제 <span id="aiSolvedCount">0</span>개 해결</span>
+                </div>
+                <div class="w-full h-3 bg-white rounded-full overflow-hidden border border-pink-200">
+                  <div id="aiProgressBar" class="h-full bg-gradient-to-r from-pink-400 to-rose-500 transition-all duration-100 rounded-full" style="width: 0%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 연산 문제 출제 & 입력 박스 -->
+        <div id="problemBox" class="bg-white/95 rounded-3xl shadow-xl border-4 border-sky-300 p-4 sm:p-6 relative flex-1 flex flex-col justify-between">
+          <!-- 상단 타이머 및 예상 포인트 표시 -->
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <div class="flex items-center gap-2 bg-amber-100 border-2 border-amber-300 px-3.5 py-1.5 rounded-2xl">
+              <span class="text-lg">⏱️</span>
+              <span class="font-jua text-lg sm:text-xl text-amber-800">
+                경과 시간: <span id="elapsedTimeDisplay" class="text-orange-600">0.0</span>초
+              </span>
+            </div>
+
+            <div class="flex items-center gap-1.5 bg-emerald-100 border-2 border-emerald-300 px-3.5 py-1.5 rounded-2xl">
+              <span class="text-base">💎</span>
+              <span class="font-jua text-base sm:text-lg text-emerald-800">
+                지금 맞히면 <span id="potentialPointsDisplay" class="text-emerald-600 text-xl">+20</span> pt!
+              </span>
+            </div>
+          </div>
+
+          <!-- 문제 수식 디스플레이 -->
+          <div class="my-auto py-4 sm:py-6 bg-gradient-to-b from-slate-50 to-sky-50/50 rounded-3xl border-2 border-dashed border-sky-200 text-center relative">
+            <div id="problemTypeBadge" class="inline-block text-xs font-bold px-3 py-0.5 rounded-full bg-sky-100 text-sky-700 mb-2">
+              덧셈 스피드 문제
+            </div>
+
+            <div class="flex items-center justify-center gap-2 sm:gap-4 font-jua text-5xl sm:text-6xl md:text-7xl text-slate-800 tracking-wider px-2">
+              <span id="numA" class="text-slate-800">7</span>
+              <span id="operatorSign" class="text-sky-500">+</span>
+              <span id="numB" class="text-slate-800">5</span>
+              <span class="text-slate-400">=</span>
+              <div id="answerInputBox" class="min-w-[95px] sm:min-w-[125px] h-16 sm:h-20 bg-white border-4 border-amber-400 rounded-2xl flex items-center justify-center text-amber-600 shadow-inner px-3">
+                <span id="userAnswerText" class="animate-pulse">?</span>
+              </div>
+            </div>
+
+            <!-- 피드백 메시지 영역 -->
+            <div id="feedbackBanner" class="h-7 mt-2 flex items-center justify-center font-jua text-base sm:text-lg text-slate-500">
+              정답 숫자를 입력하고 확인을 누르세요!
+            </div>
+          </div>
+
+          <!-- 터치 & 클릭 겸용 숫자 키패드 -->
+          <div class="mt-4">
+            <div class="grid grid-cols-6 gap-1.5 sm:gap-2">
+              <button onclick="pressKey('1')" class="jelly-btn bg-slate-100 hover:bg-sky-100 active:bg-sky-200 border-b-4 border-slate-300 rounded-2xl py-2.5 sm:py-3 font-jua text-2xl text-slate-700">1</button>
+              <button onclick="pressKey('2')" class="jelly-btn bg-slate-100 hover:bg-sky-100 active:bg-sky-200 border-b-4 border-slate-300 rounded-2xl py-2.5 sm:py-3 font-jua text-2xl text-slate-700">2</button>
+              <button onclick="pressKey('3')" class="jelly-btn bg-slate-100 hover:bg-sky-100 active:bg-sky-200 border-b-4 border-slate-300 rounded-2xl py-2.5 sm:py-3 font-jua text-2xl text-slate-700">3</button>
+              <button onclick="pressKey('4')" class="jelly-btn bg-slate-100 hover:bg-sky-100 active:bg-sky-200 border-b-4 border-slate-300 rounded-2xl py-2.5 sm:py-3 font-jua text-2xl text-slate-700">4</button>
+              <button onclick="pressKey('5')" class="jelly-btn bg-slate-100 hover:bg-sky-100 active:bg-sky-200 border-b-4 border-slate-300 rounded-2xl py-2.5 sm:py-3 font-jua text-2xl text-slate-700">5</button>
+              <button onclick="pressBackspace()" class="jelly-btn bg-rose-100 hover:bg-rose-200 border-b-4 border-rose-300 rounded-2xl py-2.5 sm:py-3 font-jua text-lg sm:text-xl text-rose-700">⬅ 지움</button>
+
+              <button onclick="pressKey('6')" class="jelly-btn bg-slate-100 hover:bg-sky-100 active:bg-sky-200 border-b-4 border-slate-300 rounded-2xl py-2.5 sm:py-3 font-jua text-2xl text-slate-700">6</button>
+              <button onclick="pressKey('7')" class="jelly-btn bg-slate-100 hover:bg-sky-100 active:bg-sky-200 border-b-4 border-slate-300 rounded-2xl py-2.5 sm:py-3 font-jua text-2xl text-slate-700">7</button>
+              <button onclick="pressKey('8')" class="jelly-btn bg-slate-100 hover:bg-sky-100 active:bg-sky-200 border-b-4 border-slate-300 rounded-2xl py-2.5 sm:py-3 font-jua text-2xl text-slate-700">8</button>
+              <button onclick="pressKey('9')" class="jelly-btn bg-slate-100 hover:bg-sky-100 active:bg-sky-200 border-b-4 border-slate-300 rounded-2xl py-2.5 sm:py-3 font-jua text-2xl text-slate-700">9</button>
+              <button onclick="pressKey('0')" class="jelly-btn bg-slate-100 hover:bg-sky-100 active:bg-sky-200 border-b-4 border-slate-300 rounded-2xl py-2.5 sm:py-3 font-jua text-2xl text-slate-700">0</button>
+              <button onclick="submitAnswer()" class="jelly-btn bg-gradient-to-r from-emerald-400 to-green-500 hover:from-emerald-500 hover:to-green-600 border-b-4 border-emerald-700 rounded-2xl py-2.5 sm:py-3 font-jua text-xl sm:text-2xl text-white shadow-md">정답!</button>
+            </div>
+            <p class="text-center text-[11px] text-slate-400 font-bold mt-1.5">
+              💡 키보드 숫자키와 Enter(엔터)키로도 빠르게 풀 수 있어요!
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 오른쪽: 나만의 방 꾸미기 & 가구 도감 (5칸) -->
+      <div class="lg:col-span-5 flex flex-col gap-4">
+        <div class="bg-white/95 rounded-3xl shadow-xl border-4 border-purple-200 p-4 flex-1 flex flex-col">
+          <div class="flex items-center justify-between mb-2">
+            <div>
+              <h2 class="font-jua text-xl sm:text-2xl text-purple-700 flex items-center gap-1.5">
+                🏡 내 캐릭터 방 꾸미기
+              </h2>
+              <p class="text-xs text-slate-500 font-bold">가구를 드래그해서 원하는 자리에 놓아보세요!</p>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button onclick="autoArrangeRoom()" class="jelly-btn bg-purple-100 hover:bg-purple-200 text-purple-700 border border-purple-300 rounded-xl px-2.5 py-1.5 font-jua text-xs">
+                ✨ 예쁘게 자동정리
+              </button>
+            </div>
+          </div>
+
+          <!-- 방 캔버스 (벽 + 바닥 + 캐릭터 + 배치된 가구) -->
+          <div id="roomCanvas" class="relative w-full h-72 sm:h-80 rounded-2xl overflow-hidden border-4 border-amber-300 shadow-inner room-wall select-none">
+            <!-- 방 바닥 영역 (하단 36%) -->
+            <div class="absolute bottom-0 inset-x-0 h-[36%] room-floor"></div>
+
+            <!-- 방 레벨 뱃지 -->
+            <div class="absolute top-2.5 left-2.5 z-40 bg-white/90 backdrop-blur px-3 py-1 rounded-full border-2 border-purple-300 font-jua text-xs text-purple-700 shadow-sm">
+              해금된 가구: <span id="unlockedCountDisplay">1</span> / 15개
+            </div>
+
+            <!-- 방 안의 내 캐릭터 (드래그 가능) -->
+            <div id="roomCharacter" class="placed-furniture w-16 h-16 sm:w-20 sm:h-20" style="left: 42%; top: 52%; z-index: 20;" title="내 캐릭터 (드래그해서 이동 가능)">
+            </div>
+
+            <!-- 해금된 가구들이 여기에 동적으로 배치됨 -->
+            <div id="roomFurnitureLayer" class="inset-0 absolute"></div>
+          </div>
+
+          <!-- 레벨별 가구 도감 리스트 -->
+          <div class="mt-3 flex-1 flex flex-col">
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="font-jua text-sm text-slate-700">🎁 레벨별 가구 보상 (클릭해서 방에 넣기/빼기)</span>
+              <span class="text-[11px] font-bold text-purple-600">100pt마다 1개 해금!</span>
+            </div>
+            <div id="furnitureCatalog" class="grid grid-cols-5 gap-1.5 max-h-44 overflow-y-auto pr-1">
+              <!-- JS로 15개 가구 카드 렌더링 -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- [모달 1] 레벨업 축하 알림 모달 -->
+  <div id="levelUpModal" class="hidden fixed inset-0 bg-black/40 backdrop-blur-xs z-40 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl border-4 border-amber-400 shadow-2xl max-w-sm w-full p-6 text-center animate-pop">
+      <div class="inline-block bg-amber-100 text-amber-700 font-jua px-3 py-1 rounded-full text-sm mb-2">
+        🎉 LEVEL UP! 🎉
+      </div>
+      <h3 class="font-jua text-3xl text-slate-800 mb-1">
+        레벨 <span id="modalNewLevel" class="text-orange-500">2</span> 달성!
+      </h3>
+      <p class="text-sm font-bold text-slate-500 mb-4">새로운 방 꾸미기 가구가 열렸어요!</p>
+
+      <div class="w-28 h-28 mx-auto bg-purple-50 rounded-3xl border-2 border-purple-200 flex items-center justify-center p-3 mb-3 shadow-inner" id="modalFurniturePreview">
+      </div>
+      <div class="font-jua text-xl text-purple-700 mb-1" id="modalFurnitureName">원목 책상</div>
+      <p class="text-xs font-bold text-slate-500 mb-5" id="modalFurnitureDesc">공부가 잘 되는 튼튼한 책상이에요.</p>
+
+      <button onclick="closeLevelUpModal()" class="jelly-btn w-full bg-gradient-to-r from-amber-400 to-orange-500 text-white font-jua text-xl py-3 rounded-2xl shadow-lg">
+        신난다! 계속 대결하기 🚀
+      </button>
+    </div>
+  </div>
+
+  <!-- [모달 2] 15레벨 게임 클리어 축하 화면 & 명예 수학왕 완주 수료증 -->
+  <div id="gameClearModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-gradient-to-b from-amber-50 via-white to-purple-50 rounded-3xl border-4 border-amber-400 shadow-2xl max-w-lg w-full p-5 sm:p-6 text-center animate-pop">
+      <div class="text-4xl mb-1">👑🎊🏆🎊👑</div>
+      <h2 class="font-jua text-2xl sm:text-3xl text-amber-600 mb-1 leading-snug">
+        '스피드 덧셈 뺄셈!'<br/>15레벨 완전 정복!
+      </h2>
+      <p class="font-bold text-slate-600 text-xs sm:text-sm mb-3">
+        15가지 가구를 모두 모아 반짝이는 황금 방을 완성했어요!
+      </p>
+
+      <!-- 트로피 & 명예 수학왕 완주 수료증 카드 -->
+      <div class="bg-gradient-to-br from-yellow-50 to-amber-100/70 rounded-2xl p-4 border-2 border-amber-300 mb-4 shadow-inner relative">
+        <div class="flex items-center justify-between border-b border-amber-200 pb-2 mb-2.5">
+          <span class="font-jua text-sm sm:text-base text-amber-800 flex items-center gap-1">
+            🏅 명예 수학왕 완주 수료증
+          </span>
+          <span class="text-[11px] font-bold bg-white/90 text-amber-700 px-2 py-0.5 rounded-full border border-amber-200">
+            Lv.15 MASTER
+          </span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 text-sm">
+          <div class="bg-white/90 rounded-xl p-2.5 border border-sky-200 shadow-2xs">
+            <div class="font-bold text-sky-700" id="clearPlayerLabel">나 (덧세미)</div>
+            <div class="font-jua text-2xl text-sky-600 mt-0.5"><span id="clearPlayerPts">1400</span> pt</div>
+            <div class="text-xs text-slate-500 font-bold">해결한 문제: <span id="clearPlayerSolved">0</span>개</div>
+          </div>
+          <div class="bg-white/90 rounded-xl p-2.5 border border-pink-200 shadow-2xs">
+            <div class="font-bold text-pink-700" id="clearAiLabel">컴퓨터 (뺄세미)</div>
+            <div class="font-jua text-2xl text-pink-600 mt-0.5"><span id="clearAiPts">0</span> pt</div>
+            <div class="text-xs text-slate-500 font-bold">해결한 문제: <span id="clearAiSolved">0</span>개</div>
+          </div>
+        </div>
+
+        <div id="clearWinnerMessage" class="mt-3 font-jua text-base sm:text-lg text-emerald-700">
+          🏆 와아! 컴퓨터를 이기고 우승했어요!
+        </div>
+        <div class="mt-2 pt-2 border-t border-amber-200/80 text-xs font-jua text-amber-800">
+          ✨ 게임 기획: 강서연 어린이
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <button onclick="continueEndlessMode()" class="jelly-btn bg-purple-500 hover:bg-purple-600 text-white font-jua text-lg py-3 rounded-2xl shadow-md">
+          🏡 방 계속 꾸미기
+        </button>
+        <button onclick="restartWholeGame()" class="jelly-btn bg-amber-500 hover:bg-amber-600 text-white font-jua text-lg py-3 rounded-2xl shadow-md">
+          🔄 처음부터 다시하기
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- [모달 3] 초기화 확인 커스텀 모달 -->
+  <div id="confirmResetModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl border-4 border-slate-300 shadow-xl max-w-xs w-full p-5 text-center animate-pop">
+      <div class="text-3xl mb-2">🤔</div>
+      <h3 class="font-jua text-2xl text-slate-800 mb-1">캐릭터를 바꿀까요?</h3>
+      <p class="text-xs font-bold text-slate-500 mb-4">지금까지 모은 포인트와 레벨이 초기화됩니다.</p>
+      <div class="grid grid-cols-2 gap-2">
+        <button onclick="closeConfirmReset()" class="jelly-btn bg-slate-200 text-slate-700 font-jua py-2.5 rounded-xl">취소</button>
+        <button onclick="restartWholeGame()" class="jelly-btn bg-rose-500 text-white font-jua py-2.5 rounded-xl">네, 바꿀래요!</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ==========================================================================
+       1. 사운드 시스템 (Web Audio API - 외부 URL 없이 효과음 합성)
+       ========================================================================== */
+    let audioCtx = null;
+    let soundEnabled = true;
+
+    function initAudio() {
+      if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function playSound(type) {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        const now = audioCtx.currentTime;
+
+        if (type === 'tap') {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(520, now);
+          osc.frequency.exponentialRampToValueAtTime(680, now + 0.06);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now);
+          osc.stop(now + 0.06);
+        } else if (type === 'correct') {
+          const notes = [523.25, 659.25, 783.99, 1046.5];
+          notes.forEach((freq, idx) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now + idx * 0.065);
+            gain.gain.setValueAtTime(0.18, now + idx * 0.065);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.065 + 0.25);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now + idx * 0.065);
+            osc.stop(now + idx * 0.065 + 0.26);
+          });
+        } else if (type === 'wrong') {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(220, now);
+          osc.frequency.linearRampToValueAtTime(150, now + 0.25);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.26);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now);
+          osc.stop(now + 0.27);
+        } else if (type === 'levelup') {
+          const melody = [523.25, 659.25, 783.99, 1046.5, 783.99, 1046.5];
+          const times = [0, 0.1, 0.2, 0.3, 0.45, 0.58];
+          melody.forEach((freq, i) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now + times[i]);
+            gain.gain.setValueAtTime(0.22, now + times[i]);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + times[i] + 0.3);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now + times[i]);
+            osc.stop(now + times[i] + 0.32);
+          });
+        } else if (type === 'pop') {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(350, now);
+          osc.frequency.exponentialRampToValueAtTime(750, now + 0.1);
+          gain.gain.setValueAtTime(0.18, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now);
+          osc.stop(now + 0.12);
+        }
+      } catch (e) {
+        // 오디오 차단 예외 무시
+      }
+    }
+
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      document.getElementById('soundIcon').textContent = soundEnabled ? '🔊' : '🔇';
+      document.getElementById('soundText').textContent = soundEnabled ? '소리 켜짐' : '소리 꺼짐';
+      if (soundEnabled) playSound('tap');
+    }
+
+    /* ==========================================================================
+       2. 귀여운 캐릭터 SVG 일러스트 ('덧세미' & '뺄세미')
+       ========================================================================== */
+    function getCharacterSVG(type) {
+      if (type === 'add') {
+        return `
+          <svg viewBox="0 0 120 120" class="w-full h-full drop-shadow-md">
+            <circle cx="20" cy="25" r="4" fill="#FBBF24" />
+            <circle cx="102" cy="32" r="3" fill="#38BDF8" />
+            <rect x="54" y="8" width="12" height="24" rx="6" fill="#F59E0B" />
+            <rect x="48" y="14" width="24" height="12" rx="6" fill="#FBBF24" />
+            <rect x="24" y="28" width="72" height="68" rx="32" fill="#38BDF8" stroke="#0284C7" stroke-width="4" />
+            <ellipse cx="60" cy="74" rx="22" ry="15" fill="#E0F2FE" />
+            <path d="M60 68 V80 M54 74 H66" stroke="#0284C7" stroke-width="4" stroke-linecap="round" />
+            <circle cx="44" cy="52" r="6" fill="#1E293B" />
+            <circle cx="76" cy="52" r="6" fill="#1E293B" />
+            <circle cx="42" cy="50" r="2" fill="#FFFFFF" />
+            <circle cx="74" cy="50" r="2" fill="#FFFFFF" />
+            <ellipse cx="35" cy="60" rx="5" ry="3" fill="#FDA4AF" />
+            <ellipse cx="85" cy="60" rx="5" ry="3" fill="#FDA4AF" />
+            <path d="M52 60 Q60 68 68 60" fill="none" stroke="#1E293B" stroke-width="3.5" stroke-linecap="round" />
+            <ellipse cx="18" cy="66" rx="8" ry="6" fill="#38BDF8" stroke="#0284C7" stroke-width="3" />
+            <ellipse cx="102" cy="66" rx="8" ry="6" fill="#38BDF8" stroke="#0284C7" stroke-width="3" />
+            <ellipse cx="44" cy="99" rx="11" ry="7" fill="#F59E0B" stroke="#B45309" stroke-width="3" />
+            <ellipse cx="76" cy="99" rx="11" ry="7" fill="#F59E0B" stroke="#B45309" stroke-width="3" />
+          </svg>
+        `;
+      } else {
+        return `
+          <svg viewBox="0 0 120 120" class="w-full h-full drop-shadow-md">
+            <circle cx="22" cy="30" r="3.5" fill="#F472B6" />
+            <circle cx="98" cy="24" r="4" fill="#C084FC" />
+            <rect x="42" y="14" width="36" height="14" rx="7" fill="#A855F7" stroke="#7E22CE" stroke-width="3" />
+            <rect x="50" y="19" width="20" height="4" rx="2" fill="#FFFFFF" />
+            <rect x="24" y="28" width="72" height="68" rx="34" fill="#F472B6" stroke="#DB2777" stroke-width="4" />
+            <ellipse cx="60" cy="74" rx="22" ry="15" fill="#FCE7F3" />
+            <path d="M53 74 H67" stroke="#DB2777" stroke-width="4.5" stroke-linecap="round" />
+            <circle cx="44" cy="52" r="6" fill="#1E293B" />
+            <circle cx="76" cy="52" r="6" fill="#1E293B" />
+            <circle cx="42" cy="50" r="2" fill="#FFFFFF" />
+            <circle cx="74" cy="50" r="2" fill="#FFFFFF" />
+            <ellipse cx="35" cy="60" rx="5" ry="3" fill="#FDE047" opacity="0.8" />
+            <ellipse cx="85" cy="60" rx="5" ry="3" fill="#FDE047" opacity="0.8" />
+            <path d="M53 60 Q60 67 67 60" fill="none" stroke="#1E293B" stroke-width="3.5" stroke-linecap="round" />
+            <ellipse cx="18" cy="66" rx="8" ry="6" fill="#F472B6" stroke="#DB2777" stroke-width="3" />
+            <ellipse cx="102" cy="66" rx="8" ry="6" fill="#F472B6" stroke="#DB2777" stroke-width="3" />
+            <ellipse cx="44" cy="99" rx="11" ry="7" fill="#A855F7" stroke="#7E22CE" stroke-width="3" />
+            <ellipse cx="76" cy="99" rx="11" ry="7" fill="#A855F7" stroke="#7E22CE" stroke-width="3" />
+          </svg>
+        `;
+      }
+    }
+
+    /* ==========================================================================
+       3. 15레벨 방 꾸미기 가구 15종 데이터 & SVG 일러스트
+       ========================================================================== */
+    const FURNITURE_ITEMS = [
+      {
+        level: 1,
+        name: '포근한 별빛 러그',
+        desc: '발이 포근해지는 동그란 파스텔 러그예요.',
+        defaultPos: { x: 28, y: 68, w: 44, z: 5 },
+        svg: `<svg viewBox="0 0 140 50" class="w-full h-full"><ellipse cx="70" cy="25" rx="64" ry="20" fill="#FDE68A" stroke="#F59E0B" stroke-width="3"/><ellipse cx="70" cy="25" rx="50" ry="14" fill="#FEF3C7" stroke="#FBBF24" stroke-width="2" stroke-dasharray="6 4"/><text x="70" y="30" text-anchor="middle" font-size="16">⭐</text></svg>`
+      },
+      {
+        level: 2,
+        name: '원목 공부 책상',
+        desc: '수학 문제를 척척 풀 수 있는 튼튼한 책상!',
+        defaultPos: { x: 8, y: 50, w: 28, z: 12 },
+        svg: `<svg viewBox="0 0 100 80" class="w-full h-full"><rect x="8" y="28" width="84" height="10" rx="4" fill="#D97706" stroke="#92400E" stroke-width="3"/><rect x="14" y="38" width="10" height="36" rx="2" fill="#B45309"/><rect x="76" y="38" width="10" height="36" rx="2" fill="#B45309"/><rect x="54" y="38" width="24" height="22" rx="2" fill="#F59E0B" stroke="#92400E" stroke-width="2"/><circle cx="66" cy="49" r="2.5" fill="#FEF3C7"/></svg>`
+      },
+      {
+        level: 3,
+        name: '푹신한 구름 침대',
+        desc: '꿀잠을 잘 수 있는 폭신한 분홍 침대!',
+        defaultPos: { x: 64, y: 46, w: 32, z: 12 },
+        svg: `<svg viewBox="0 0 120 80" class="w-full h-full"><rect x="8" y="16" width="14" height="56" rx="5" fill="#EC4899" stroke="#9D174D" stroke-width="3"/><rect x="98" y="32" width="14" height="40" rx="5" fill="#EC4899" stroke="#9D174D" stroke-width="3"/><rect x="18" y="42" width="84" height="24" rx="6" fill="#FBCFE8" stroke="#DB2777" stroke-width="3"/><rect x="22" y="32" width="24" height="12" rx="6" fill="#FFFFFF" stroke="#F472B6" stroke-width="2"/><path d="M46 42 H98 V62 H46 Z" fill="#F472B6"/></svg>`
+      },
+      {
+        level: 4,
+        name: '알록달록 책장',
+        desc: '재미있는 동화책과 수학책이 가득해요.',
+        defaultPos: { x: 42, y: 34, w: 20, z: 10 },
+        svg: `<svg viewBox="0 0 80 100" class="w-full h-full"><rect x="10" y="8" width="60" height="84" rx="6" fill="#FBBF24" stroke="#B45309" stroke-width="3"/><line x1="12" y1="36" x2="68" y2="36" stroke="#B45309" stroke-width="3"/><line x1="12" y1="64" x2="68" y2="64" stroke="#B45309" stroke-width="3"/><rect x="18" y="16" width="8" height="18" rx="2" fill="#EF4444"/><rect x="28" y="14" width="8" height="20" rx="2" fill="#3B82F6"/><rect x="38" y="17" width="8" height="17" rx="2" fill="#10B981"/><rect x="20" y="44" width="9" height="18" rx="2" fill="#8B5CF6"/><rect x="31" y="46" width="9" height="16" rx="2" fill="#EC4899"/></svg>`
+      },
+      {
+        level: 5,
+        name: '따뜻한 스탠드 조명',
+        desc: '방을 은은하게 밝혀주는 노란 스탠드!',
+        defaultPos: { x: 86, y: 34, w: 12, z: 11 },
+        svg: `<svg viewBox="0 0 60 110" class="w-full h-full"><polygon points="14,34 46,34 38,10 22,10" fill="#FDE047" stroke="#CA8A04" stroke-width="3"/><line x1="30" y1="34" x2="30" y2="96" stroke="#78350F" stroke-width="5"/><ellipse cx="30" cy="98" rx="16" ry="6" fill="#92400E"/></svg>`
+      },
+      {
+        level: 6,
+        name: '초록 새싹 화분',
+        desc: '공기를 맑게 해주는 귀여운 화분이에요.',
+        defaultPos: { x: 3, y: 64, w: 12, z: 16 },
+        svg: `<svg viewBox="0 0 60 80" class="w-full h-full"><polygon points="16,44 44,44 40,72 20,72" fill="#FB923C" stroke="#C2410C" stroke-width="3"/><ellipse cx="30" cy="44" rx="16" ry="5" fill="#EA580C"/><path d="M30 42 Q15 24 22 14 Q32 22 30 42" fill="#22C55E" stroke="#15803D" stroke-width="2"/><path d="M30 42 Q45 22 38 12 Q28 22 30 42" fill="#4ADE80" stroke="#15803D" stroke-width="2"/></svg>`
+      },
+      {
+        level: 7,
+        name: '똑딱똑딱 벽시계',
+        desc: '스피드 대결 시간을 알려주는 시계!',
+        defaultPos: { x: 24, y: 12, w: 13, z: 8 },
+        svg: `<svg viewBox="0 0 70 70" class="w-full h-full"><circle cx="35" cy="35" r="28" fill="#FFFFFF" stroke="#3B82F6" stroke-width="5"/><circle cx="35" cy="35" r="3" fill="#1E293B"/><line x1="35" y1="35" x2="35" y2="18" stroke="#1E293B" stroke-width="3.5" stroke-linecap="round"/><line x1="35" y1="35" x2="48" y2="35" stroke="#EF4444" stroke-width="3" stroke-linecap="round"/></svg>`
+      },
+      {
+        level: 8,
+        name: '동글동글 어항',
+        desc: '귀여운 금붕어가 헤엄치는 투명 어항!',
+        defaultPos: { x: 16, y: 37, w: 14, z: 15 },
+        svg: `<svg viewBox="0 0 70 70" class="w-full h-full"><circle cx="35" cy="38" r="24" fill="#BAE6FD" stroke="#0284C7" stroke-width="3"/><ellipse cx="35" cy="16" rx="14" ry="4" fill="#E0F2FE" stroke="#0284C7" stroke-width="2"/><ellipse cx="34" cy="40" rx="9" ry="5" fill="#FB923C"/><polygon points="42,40 50,34 50,46" fill="#F97316"/><circle cx="29" cy="39" r="1.5" fill="#000"/></svg>`
+      },
+      {
+        level: 9,
+        name: '신나는 오락 게임기',
+        desc: '휴식 시간에 즐길 수 있는 미니 게임기!',
+        defaultPos: { x: 18, y: 58, w: 14, z: 16 },
+        svg: `<svg viewBox="0 0 70 90" class="w-full h-full"><rect x="14" y="10" width="42" height="72" rx="8" fill="#6366F1" stroke="#3730A3" stroke-width="3"/><rect x="20" y="18" width="30" height="24" rx="4" fill="#38BDF8" stroke="#1E1B4B" stroke-width="2"/><circle cx="26" cy="54" r="4" fill="#FACC15"/><circle cx="43" cy="52" r="3" fill="#F43F5E"/><circle cx="48" cy="57" r="3" fill="#4ADE80"/></svg>`
+      },
+      {
+        level: 10,
+        name: '왕리본 곰인형',
+        desc: '침대 옆을 지켜주는 다정한 친구예요.',
+        defaultPos: { x: 74, y: 35, w: 14, z: 15 },
+        svg: `<svg viewBox="0 0 70 80" class="w-full h-full"><circle cx="20" cy="20" r="9" fill="#B45309"/><circle cx="50" cy="20" r="9" fill="#B45309"/><circle cx="35" cy="32" r="18" fill="#D97706"/><ellipse cx="35" cy="56" rx="16" ry="18" fill="#D97706"/><ellipse cx="35" cy="36" rx="7" ry="5" fill="#FDE68A"/><circle cx="29" cy="29" r="2.5" fill="#1E293B"/><circle cx="41" cy="29" r="2.5" fill="#1E293B"/><circle cx="35" cy="34" r="2.5" fill="#1E293B"/><path d="M27 44 L43 44 L35 48 Z" fill="#EF4444"/></svg>`
+      },
+      {
+        level: 11,
+        name: '보라빛 푹신 소파',
+        desc: '친구들과 나란히 앉을 수 있는 폭신한 소파!',
+        defaultPos: { x: 34, y: 74, w: 32, z: 17 },
+        svg: `<svg viewBox="0 0 120 70" class="w-full h-full"><rect x="16" y="14" width="88" height="32" rx="12" fill="#C084FC" stroke="#7E22CE" stroke-width="3"/><rect x="8" y="28" width="16" height="30" rx="7" fill="#A855F7" stroke="#7E22CE" stroke-width="3"/><rect x="96" y="28" width="16" height="30" rx="7" fill="#A855F7" stroke="#7E22CE" stroke-width="3"/><rect x="20" y="38" width="80" height="20" rx="6" fill="#E9D5FF" stroke="#7E22CE" stroke-width="3"/></svg>`
+      },
+      {
+        level: 12,
+        name: '빙글빙글 지구본',
+        desc: '세계 여러 나라를 탐험할 수 있는 지구본!',
+        defaultPos: { x: 45, y: 21, w: 13, z: 13 },
+        svg: `<svg viewBox="0 0 70 80" class="w-full h-full"><circle cx="35" cy="34" r="20" fill="#38BDF8" stroke="#0284C7" stroke-width="3"/><path d="M25 24 Q34 28 30 38 Q22 36 25 24 Z" fill="#4ADE80"/><path d="M40 28 Q48 32 45 42 Q37 40 40 28 Z" fill="#4ADE80"/><path d="M20 50 Q35 60 50 50" fill="none" stroke="#D97706" stroke-width="3.5"/><line x1="35" y1="55" x2="35" y2="68" stroke="#92400E" stroke-width="4"/><rect x="22" y="67" width="26" height="6" rx="3" fill="#B45309"/></svg>`
+      },
+      {
+        level: 13,
+        name: '와이드 대형 TV',
+        desc: '선명한 화면으로 만화와 퀴즈를 보는 대형 TV!',
+        defaultPos: { x: 64, y: 12, w: 22, z: 9 },
+        svg: `<svg viewBox="0 0 100 70" class="w-full h-full"><rect x="10" y="10" width="80" height="46" rx="6" fill="#1E293B" stroke="#0F172A" stroke-width="3"/><rect x="15" y="15" width="70" height="36" rx="3" fill="#7DD3FC"/><circle cx="38" cy="33" r="6" fill="#FDE047"/><polygon points="52,27 64,33 52,39" fill="#FFFFFF"/><rect x="44" y="56" width="12" height="8" fill="#475569"/><rect x="32" y="63" width="36" height="4" rx="2" fill="#334155"/></svg>`
+      },
+      {
+        level: 14,
+        name: '수학왕 황금 트로피',
+        desc: '연산 대결 우승 기념 눈부신 황금 트로피!',
+        defaultPos: { x: 54, y: 54, w: 13, z: 16 },
+        svg: `<svg viewBox="0 0 70 80" class="w-full h-full"><path d="M20 14 H50 L45 42 Q35 52 25 42 Z" fill="#FACC15" stroke="#CA8A04" stroke-width="3"/><rect x="31" y="46" width="8" height="14" fill="#EAB308"/><rect x="20" y="60" width="30" height="10" rx="3" fill="#78350F"/><text x="35" y="34" text-anchor="middle" font-size="14" font-weight="bold" fill="#92400E">1등</text></svg>`
+      },
+      {
+        level: 15,
+        name: '반짝이는 샹들리에',
+        desc: '15레벨 클리어 기념 최고급 보석 샹들리에!',
+        defaultPos: { x: 40, y: 2, w: 20, z: 25 },
+        svg: `<svg viewBox="0 0 100 70" class="w-full h-full"><line x1="50" y1="0" x2="50" y2="18" stroke="#D97706" stroke-width="4"/><path d="M22 36 Q50 14 78 36" fill="none" stroke="#F59E0B" stroke-width="4"/><circle cx="22" cy="34" r="7" fill="#FEF08A" stroke="#F59E0B" stroke-width="2"/><circle cx="50" cy="26" r="9" fill="#FEF08A" stroke="#F59E0B" stroke-width="2"/><circle cx="78" cy="34" r="7" fill="#FEF08A" stroke="#F59E0B" stroke-width="2"/><polygon points="50,40 44,54 50,62 56,54" fill="#38BDF8" stroke="#0284C7" stroke-width="2"/></svg>`
+      }
+    ];
+
+    /* ==========================================================================
+       4. 게임 핵심 상태 변수
+       ========================================================================== */
+    const state = {
+      playerChar: null,      // 'add' (덧세미) 또는 'sub' (뺄세미)
+      aiChar: null,
+      playerPoints: 0,
+      aiPoints: 0,
+      playerLevel: 1,
+      aiLevel: 1,
+      playerSolved: 0,
+      aiSolved: 0,
+      currentProblem: { a: 0, b: 0, op: '+', answer: 0 },
+      userInput: '',
+      problemStartTime: 0,
+      timerInterval: null,
+      aiDifficulty: 'normal', // 'easy', 'normal', 'fast'
+      aiElapsed: 0,
+      aiTargetTime: 4.5,
+      isPaused: false,
+      hasCleared: false,
+      placedFurniture: {},    // { level: { visible: true, x, y } }
+      highestUnlockedLevel: 1
+    };
+
+    /* ==========================================================================
+       5. 초기화 및 화면 전환 로직
+       ========================================================================== */
+    window.onload = function () {
+      document.getElementById('previewAddChar').innerHTML = getCharacterSVG('add');
+      document.getElementById('previewSubChar').innerHTML = getCharacterSVG('sub');
+      setupKeyboardListener();
+      setupRoomDragHandlers();
+    };
+
+    function selectCharacter(charType) {
+      initAudio();
+      playSound('levelup');
+
+      state.playerChar = charType;
+      state.aiChar = charType === 'add' ? 'sub' : 'add';
+      state.playerPoints = 0;
+      state.aiPoints = 0;
+      state.playerLevel = 1;
+      state.aiLevel = 1;
+      state.playerSolved = 0;
+      state.aiSolved = 0;
+      state.hasCleared = false;
+      state.isPaused = false;
+      state.highestUnlockedLevel = 1;
+      state.placedFurniture = {};
+
+      // Lv.1 기본 가구 배치
+      unlockFurnitureForLevel(1, true);
+
+      // UI 전환
+      document.getElementById('characterSelectScreen').classList.add('hidden');
+      document.getElementById('gamePlayScreen').classList.remove('hidden');
+      document.getElementById('resetToMenuBtn').classList.remove('hidden');
+      document.getElementById('aiSpeedBadge').classList.remove('hidden');
+
+      // 캐릭터 프로필 및 테마 세팅
+      const pName = state.playerChar === 'add' ? '덧세미' : '뺄세미';
+      const aName = state.aiChar === 'add' ? '덧세미' : '뺄세미';
+
+      document.getElementById('playerCharName').textContent = pName;
+      document.getElementById('aiCharName').textContent = aName;
+      document.getElementById('playerAvatarSmall').innerHTML = getCharacterSVG(state.playerChar);
+      document.getElementById('aiAvatarSmall').innerHTML = getCharacterSVG(state.aiChar);
+      document.getElementById('roomCharacter').innerHTML = getCharacterSVG(state.playerChar);
+
+      updateScoreUI();
+      renderFurnitureCatalog();
+      renderRoomFurniture();
+      generateNextProblem();
+      startLoops();
+    }
+
+    function changeAiDifficulty(val) {
+      state.aiDifficulty = val;
+      resetAiTurn();
+    }
+
+    function openConfirmReset() {
+      state.isPaused = true;
+      document.getElementById('confirmResetModal').classList.remove('hidden');
+    }
+
+    function closeConfirmReset() {
+      document.getElementById('confirmResetModal').classList.add('hidden');
+      state.isPaused = false;
+      state.problemStartTime = performance.now();
+    }
+
+    function restartWholeGame() {
+      stopLoops();
+      document.getElementById('confirmResetModal').classList.add('hidden');
+      document.getElementById('gameClearModal').classList.add('hidden');
+      document.getElementById('levelUpModal').classList.add('hidden');
+      document.getElementById('gamePlayScreen').classList.add('hidden');
+      document.getElementById('resetToMenuBtn').classList.add('hidden');
+      document.getElementById('characterSelectScreen').classList.remove('hidden');
+    }
+
+    /* ==========================================================================
+       6. 스피드 포인트 계산 규칙 & 문제 출제 알고리즘
+       ========================================================================== */
+    /**
+     * 규칙:
+     * - 문제 풀이 시간(초)을 0.5초 단위로 반올림 (Math.round(sec * 2) / 2)
+     * - 1.0초 이하: 20포인트
+     * - 5.5초 이상: 10포인트
+     * - 1.0초 ~ 5.5초 사이: 0.5초마다 1포인트씩 차등 지급 (1.5초=19pt, 2.0초=18pt, ..., 5.0초=11pt, 5.5초=10pt)
+     */
+    function calculateSpeedPoints(rawSeconds) {
+      const roundedHalfSec = Math.round(rawSeconds * 2) / 2;
+
+      if (roundedHalfSec <= 1.0) {
+        return { roundedSec: roundedHalfSec.toFixed(1), points: 20 };
+      }
+      if (roundedHalfSec >= 5.5) {
+        return { roundedSec: roundedHalfSec.toFixed(1), points: 10 };
+      }
+
+      const stepsOverOneSec = Math.round((roundedHalfSec - 1.0) / 0.5);
+      const pts = Math.max(10, 20 - stepsOverOneSec);
+      return { roundedSec: roundedHalfSec.toFixed(1), points: pts };
+    }
+
+    function generateNextProblem() {
+      state.userInput = '';
+      updateAnswerDisplay();
+
+      // 선택한 캐릭터 특성에 따라 주력 연산 비중을 75%로 설정하고 25%는 혼합 출제
+      let op = '+';
+      if (state.playerChar === 'add') {
+        op = Math.random() < 0.75 ? '+' : '-';
+      } else {
+        op = Math.random() < 0.75 ? '-' : '+';
+      }
+
+      // 초등학생 눈높이에 맞춘 자연스러운 난이도 증가
+      const maxBase = Math.min(9 + state.playerLevel * 2, 35);
+      let a = 0, b = 0, answer = 0;
+
+      if (op === '+') {
+        a = Math.floor(Math.random() * maxBase) + 1;
+        b = Math.floor(Math.random() * maxBase) + 1;
+        answer = a + b;
+      } else {
+        a = Math.floor(Math.random() * maxBase) + 3;
+        b = Math.floor(Math.random() * (a - 1)) + 1;
+        answer = a - b;
+      }
+
+      state.currentProblem = { a, b, op, answer };
+      state.problemStartTime = performance.now();
+
+      document.getElementById('numA').textContent = a;
+      document.getElementById('numB').textContent = b;
+      const opEl = document.getElementById('operatorSign');
+      const badgeEl = document.getElementById('problemTypeBadge');
+
+      if (op === '+') {
+        opEl.textContent = '+';
+        opEl.className = 'text-sky-500';
+        badgeEl.textContent = '➕ 스피드 덧셈 문제';
+        badgeEl.className = 'inline-block text-xs font-bold px-3 py-0.5 rounded-full bg-sky-100 text-sky-700 mb-2';
+      } else {
+        opEl.textContent = '-';
+        opEl.className = 'text-pink-500';
+        badgeEl.textContent = '➖ 스피드 뺄셈 문제';
+        badgeEl.className = 'inline-block text-xs font-bold px-3 py-0.5 rounded-full bg-pink-100 text-pink-700 mb-2';
+      }
+    }
+
+    /* ==========================================================================
+       7. 타이머 & 컴퓨터(AI) 실시간 대결 루프
+       ========================================================================== */
+    function startLoops() {
+      stopLoops();
+      resetAiTurn();
+
+      state.timerInterval = setInterval(() => {
+        if (state.isPaused) return;
+
+        // 1) 플레이어 경과 시간 & 예상 포인트 업데이트
+        const elapsed = (performance.now() - state.problemStartTime) / 1000;
+        const calc = calculateSpeedPoints(elapsed);
+        document.getElementById('elapsedTimeDisplay').textContent = elapsed.toFixed(1);
+        document.getElementById('potentialPointsDisplay').textContent = `+${calc.points}`;
+
+        // 2) 컴퓨터(AI) 진행 업데이트
+        state.aiElapsed += 0.1;
+        const pct = Math.min(100, (state.aiElapsed / state.aiTargetTime) * 100);
+        document.getElementById('aiProgressBar').style.width = `${pct}%`;
+
+        if (state.aiElapsed >= state.aiTargetTime) {
+          handleAiSolvedProblem();
+        }
+      }, 100);
+    }
+
+    function stopLoops() {
+      if (state.timerInterval) clearInterval(state.timerInterval);
+    }
+
+    function resetAiTurn() {
+      state.aiElapsed = 0;
+      document.getElementById('aiProgressBar').style.width = '0%';
+
+      if (state.aiDifficulty === 'easy') {
+        state.aiTargetTime = 5.5 + Math.random() * 2.5;
+      } else if (state.aiDifficulty === 'fast') {
+        state.aiTargetTime = 2.2 + Math.random() * 1.5;
+      } else {
+        state.aiTargetTime = 3.5 + Math.random() * 2.0;
+      }
+    }
+
+    function handleAiSolvedProblem() {
+      const calc = calculateSpeedPoints(state.aiTargetTime);
+      state.aiPoints += calc.points;
+      state.aiSolved += 1;
+      state.aiLevel = Math.floor(state.aiPoints / 100) + 1;
+
+      const label = document.getElementById('aiThinkingLabel');
+      label.textContent = `정답! +${calc.points}pt 획득!`;
+      label.classList.add('text-pink-600');
+      setTimeout(() => {
+        label.textContent = 'AI 문제 푸는 중...';
+        label.classList.remove('text-pink-600');
+      }, 900);
+
+      updateScoreUI();
+      resetAiTurn();
+    }
+
+    /* ==========================================================================
+       8. 사용자 입력 및 정답 검증 처리
+       ========================================================================== */
+    function pressKey(digit) {
+      if (state.isPaused) return;
+      if (state.userInput.length >= 3) return;
+      playSound('tap');
+      state.userInput += digit;
+      updateAnswerDisplay();
+    }
+
+    function pressBackspace() {
+      if (state.isPaused) return;
+      playSound('tap');
+      state.userInput = state.userInput.slice(0, -1);
+      updateAnswerDisplay();
+    }
+
+    function updateAnswerDisplay() {
+      const el = document.getElementById('userAnswerText');
+      if (state.userInput === '') {
+        el.textContent = '?';
+        el.classList.add('animate-pulse', 'text-amber-400');
+        el.classList.remove('text-slate-800');
+      } else {
+        el.textContent = state.userInput;
+        el.classList.remove('animate-pulse', 'text-amber-400');
+        el.classList.add('text-slate-800');
+      }
+    }
+
+    function setupKeyboardListener() {
+      window.addEventListener('keydown', (e) => {
+        if (document.getElementById('gamePlayScreen').classList.contains('hidden')) return;
+        if (state.isPaused) {
+          if (e.key === 'Enter' && !document.getElementById('levelUpModal').classList.contains('hidden')) {
+            closeLevelUpModal();
+          }
+          return;
+        }
+
+        if (e.key >= '0' && e.key <= '9') {
+          e.preventDefault();
+          pressKey(e.key);
+        } else if (e.key === 'Backspace' || e.key === 'Delete') {
+          e.preventDefault();
+          pressBackspace();
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          submitAnswer();
+        }
+      });
+    }
+
+    function submitAnswer() {
+      if (state.isPaused || state.userInput === '') return;
+
+      const numericAns = parseInt(state.userInput, 10);
+      const feedbackEl = document.getElementById('feedbackBanner');
+      const problemBox = document.getElementById('problemBox');
+
+      if (numericAns === state.currentProblem.answer) {
+        playSound('correct');
+        const elapsed = (performance.now() - state.problemStartTime) / 1000;
+        const { roundedSec, points } = calculateSpeedPoints(elapsed);
+
+        state.playerPoints += points;
+        state.playerSolved += 1;
+
+        feedbackEl.innerHTML = `<span class="text-emerald-600">🎉 정답! (${roundedSec}초 → +${points} 포인트!)</span>`;
+        spawnFloatingScore(`+${points} pt!`);
+
+        const newLevel = Math.floor(state.playerPoints / 100) + 1;
+        const leveledUp = newLevel > state.playerLevel;
+        state.playerLevel = newLevel;
+
+        updateScoreUI();
+
+        if (leveledUp) {
+          handleLevelUp(newLevel);
+        } else {
+          generateNextProblem();
+        }
+      } else {
+        playSound('wrong');
+        feedbackEl.innerHTML = `<span class="text-rose-500">😅 앗, 아쉬워요! 다시 계산해 볼까요?</span>`;
+        problemBox.classList.remove('animate-shake');
+        void problemBox.offsetWidth;
+        problemBox.classList.add('animate-shake');
+        state.userInput = '';
+        updateAnswerDisplay();
+      }
+    }
+
+    function spawnFloatingScore(text) {
+      const box = document.getElementById('problemBox');
+      const popup = document.createElement('div');
+      popup.className = 'score-popup absolute top-14 right-8 font-jua text-3xl text-emerald-500 drop-shadow';
+      popup.textContent = text;
+      box.appendChild(popup);
+      setTimeout(() => popup.remove(), 1150);
+    }
+
+    function updateScoreUI() {
+      document.getElementById('playerPointsDisplay').textContent = state.playerPoints;
+      document.getElementById('playerLevelDisplay').textContent = state.playerLevel;
+      document.getElementById('aiPointsDisplay').textContent = state.aiPoints;
+      document.getElementById('aiLevelDisplay').textContent = state.aiLevel;
+      document.getElementById('aiSolvedCount').textContent = state.aiSolved;
+
+      const remainder = state.playerPoints % 100;
+      document.getElementById('levelProgressText').textContent = remainder;
+      document.getElementById('playerLevelBar').style.width = `${remainder}%`;
+
+      const statusBadge = document.getElementById('battleStatusText');
+      if (state.playerPoints > state.aiPoints) {
+        statusBadge.textContent = `내가 ${state.playerPoints - state.aiPoints}pt 앞서고 있어요! 🔥`;
+        statusBadge.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700';
+      } else if (state.playerPoints < state.aiPoints) {
+        statusBadge.textContent = `컴퓨터가 ${state.aiPoints - state.playerPoints}pt 앞서요! 분발하자! ⚡`;
+        statusBadge.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-rose-100 text-rose-700';
+      } else {
+        statusBadge.textContent = '막상막하 동점 대결! 🤝';
+        statusBadge.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700';
+      }
+    }
+
+    /* ==========================================================================
+       9. 레벨업 및 15레벨 게임 클리어 처리
+       ========================================================================== */
+    function handleLevelUp(newLevel) {
+      playSound('levelup');
+
+      if (newLevel > state.highestUnlockedLevel) {
+        state.highestUnlockedLevel = newLevel;
+      }
+
+      if (newLevel <= 15) {
+        unlockFurnitureForLevel(newLevel, true);
+        renderFurnitureCatalog();
+        renderRoomFurniture();
+      }
+
+      // 15레벨 달성 시 게임 클리어 모달 & 명예 수학왕 완주 수료증 호출
+      if (newLevel >= 15 && !state.hasCleared) {
+        state.hasCleared = true;
+        state.isPaused = true;
+        fireConfetti();
+        showGameClearModal();
+        return;
+      }
+
+      if (newLevel <= 15) {
+        state.isPaused = true;
+        const item = FURNITURE_ITEMS[newLevel - 1];
+        document.getElementById('modalNewLevel').textContent = newLevel;
+        document.getElementById('modalFurnitureName').textContent = item.name;
+        document.getElementById('modalFurnitureDesc').textContent = item.desc;
+        document.getElementById('modalFurniturePreview').innerHTML = item.svg;
+        document.getElementById('levelUpModal').classList.remove('hidden');
+      } else {
+        generateNextProblem();
+      }
+    }
+
+    function closeLevelUpModal() {
+      document.getElementById('levelUpModal').classList.add('hidden');
+      state.isPaused = false;
+      generateNextProblem();
+    }
+
+    function showGameClearModal() {
+      const pName = state.playerChar === 'add' ? '덧세미' : '뺄세미';
+      const aName = state.aiChar === 'add' ? '덧세미' : '뺄세미';
+
+      document.getElementById('clearPlayerLabel').textContent = `나 (${pName})`;
+      document.getElementById('clearPlayerPts').textContent = state.playerPoints;
+      document.getElementById('clearPlayerSolved').textContent = state.playerSolved;
+
+      document.getElementById('clearAiLabel').textContent = `컴퓨터 (${aName})`;
+      document.getElementById('clearAiPts').textContent = state.aiPoints;
+      document.getElementById('clearAiSolved').textContent = state.aiSolved;
+
+      const winMsg = document.getElementById('clearWinnerMessage');
+      if (state.playerPoints >= state.aiPoints) {
+        winMsg.textContent = '🏆 와아! 컴퓨터를 이기고 완벽하게 클리어했어요!';
+      } else {
+        winMsg.textContent = '👏 15레벨 방 완성 클리어! 다음엔 점수 대결도 이겨봐요!';
+      }
+
+      document.getElementById('gameClearModal').classList.remove('hidden');
+    }
+
+    function continueEndlessMode() {
+      document.getElementById('gameClearModal').classList.add('hidden');
+      state.isPaused = false;
+      generateNextProblem();
+    }
+
+    /* ==========================================================================
+       10. 방 꾸미기 가구 배치 & 드래그 인터랙션 (PC 마우스 & 모바일 터치 지원)
+       ========================================================================== */
+    function unlockFurnitureForLevel(level, visible = true) {
+      const item = FURNITURE_ITEMS[level - 1];
+      if (!item) return;
+      if (!state.placedFurniture[level]) {
+        state.placedFurniture[level] = {
+          visible: visible,
+          x: item.defaultPos.x,
+          y: item.defaultPos.y
+        };
+      }
+    }
+
+    function toggleFurnitureVisibility(level) {
+      if (level > state.highestUnlockedLevel) return;
+      playSound('pop');
+      const current = state.placedFurniture[level];
+      if (current) {
+        current.visible = !current.visible;
+      } else {
+        unlockFurnitureForLevel(level, true);
+      }
+      renderFurnitureCatalog();
+      renderRoomFurniture();
+    }
+
+    function autoArrangeRoom() {
+      playSound('pop');
+      for (let lv = 1; lv <= Math.min(15, state.highestUnlockedLevel); lv++) {
+        const item = FURNITURE_ITEMS[lv - 1];
+        state.placedFurniture[lv] = {
+          visible: true,
+          x: item.defaultPos.x,
+          y: item.defaultPos.y
+        };
+      }
+      const charEl = document.getElementById('roomCharacter');
+      charEl.style.left = '43%';
+      charEl.style.top = '50%';
+
+      renderFurnitureCatalog();
+      renderRoomFurniture();
+    }
+
+    function renderFurnitureCatalog() {
+      const container = document.getElementById('furnitureCatalog');
+      const unlockedCount = Math.min(15, state.highestUnlockedLevel);
+      document.getElementById('unlockedCountDisplay').textContent = unlockedCount;
+
+      container.innerHTML = FURNITURE_ITEMS.map((item) => {
+        const isUnlocked = item.level <= state.highestUnlockedLevel;
+        const isPlaced = isUnlocked && state.placedFurniture[item.level]?.visible;
+
+        if (!isUnlocked) {
+          return `
+            <div class="bg-slate-100 border-2 border-slate-200 rounded-xl p-1.5 text-center opacity-65 flex flex-col items-center justify-center" title="레벨 ${item.level} 달성 시 해금">
+              <div class="text-lg">🔒</div>
+              <div class="font-jua text-[11px] text-slate-500">Lv.${item.level}</div>
+            </div>
+          `;
+        }
+
+        return `
+          <button onclick="toggleFurnitureVisibility(${item.level})"
+            class="jelly-btn rounded-xl p-1.5 border-2 text-center flex flex-col items-center justify-between transition-all ${
+              isPlaced
+                ? 'bg-purple-50 border-purple-400 shadow-xs'
+                : 'bg-white border-slate-200 opacity-70 hover:opacity-100'
+            }"
+            title="${item.name} (클릭해서 방에 넣기/빼기)">
+            <div class="w-9 h-9">${item.svg}</div>
+            <div class="font-jua text-[10px] leading-tight truncate w-full ${isPlaced ? 'text-purple-700' : 'text-slate-500'}">
+              ${item.name.split(' ').pop()}
+            </div>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function renderRoomFurniture() {
+      const layer = document.getElementById('roomFurnitureLayer');
+      layer.innerHTML = '';
+
+      FURNITURE_ITEMS.forEach((item) => {
+        const data = state.placedFurniture[item.level];
+        if (!data || !data.visible) return;
+
+        const el = document.createElement('div');
+        el.className = 'placed-furniture';
+        el.dataset.level = item.level;
+        el.style.left = `${data.x}%`;
+        el.style.top = `${data.y}%`;
+        el.style.width = `${item.defaultPos.w}%`;
+        el.style.zIndex = item.defaultPos.z;
+        el.title = `${item.name} (드래그해서 이동)`;
+        el.innerHTML = item.svg;
+
+        layer.appendChild(el);
+      });
+    }
+
+    function setupRoomDragHandlers() {
+      const room = document.getElementById('roomCanvas');
+      let activeEl = null;
+      let startX = 0, startY = 0;
+      let origLeftPct = 0, origTopPct = 0;
+
+      function onPointerDown(e) {
+        const target = e.target.closest('.placed-furniture');
+        if (!target || !room.contains(target)) return;
+
+        activeEl = target;
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        startX = clientX;
+        startY = clientY;
+
+        origLeftPct = parseFloat(activeEl.style.left) || 0;
+        origTopPct = parseFloat(activeEl.style.top) || 0;
+        playSound('tap');
+      }
+
+      function onPointerMove(e) {
+        if (!activeEl) return;
+        e.preventDefault();
+
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const rect = room.getBoundingClientRect();
+
+        const dxPct = ((clientX - startX) / rect.width) * 100;
+        const dyPct = ((clientY - startY) / rect.height) * 100;
+
+        const newX = Math.max(0, Math.min(85, origLeftPct + dxPct));
+        const newY = Math.max(0, Math.min(82, origTopPct + dyPct));
+
+        activeEl.style.left = `${newX}%`;
+        activeEl.style.top = `${newY}%`;
+
+        const lv = activeEl.dataset.level;
+        if (lv && state.placedFurniture[lv]) {
+          state.placedFurniture[lv].x = newX;
+          state.placedFurniture[lv].y = newY;
+        }
+      }
+
+      function onPointerUp() {
+        if (activeEl) {
+          playSound('pop');
+          activeEl = null;
+        }
+      }
+
+      room.addEventListener('mousedown', onPointerDown);
+      window.addEventListener('mousemove', onPointerMove);
+      window.addEventListener('mouseup', onPointerUp);
+
+      room.addEventListener('touchstart', onPointerDown, { passive: false });
+      window.addEventListener('touchmove', onPointerMove, { passive: false });
+      window.addEventListener('touchend', onPointerUp);
+    }
+
+    /* ==========================================================================
+       11. 15레벨 클리어 축하 폭죽 애니메이션 (Canvas)
+       ========================================================================== */
+    function fireConfetti() {
+      const canvas = document.getElementById('confettiCanvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      const colors = ['#F43F5E', '#38BDF8', '#FACC15', '#4ADE80', '#A855F7', '#FB923C'];
+      const particles = Array.from({ length: 140 }, () => ({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height - canvas.height,
+        w: Math.random() * 10 + 6,
+        h: Math.random() * 6 + 4,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        vy: Math.random() * 4 + 2.5,
+        vx: (Math.random() - 0.5) * 3,
+        rot: Math.random() * 360,
+        vRot: (Math.random() - 0.5) * 8
+      }));
+
+      let frames = 0;
+      function animateConfetti() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        particles.forEach((p) => {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.rot += p.vRot;
+
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate((p.rot * Math.PI) / 180);
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+          ctx.restore();
+        });
+
+        frames++;
+        if (frames < 260) {
+          requestAnimationFrame(animateConfetti);
+        } else {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+      }
+      animateConfetti();
+    }
+  </script>
+</body>
+</html>
